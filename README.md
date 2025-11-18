@@ -1,141 +1,184 @@
 # FieldOpt
-[v0.0.2]
-![til](./assets/fieldopt-Demo1.png)
-![til](./assets/fieldopt-Demo2.png)
-![til](./assets/fieldopt-Demo3.png)
-![til](./assets/fieldopt-Demo4.png)
-
 ## Overview
-An open-source field service management (FSM) system built using FastAPI and SQLite. It lets you create technicians and jobs, auto-assign work based on skills, and manage job state transitions using FSM-style logic (pending → assigned → in progress → completed).
+An open source field service management system built using FastAPI, PostgresSQL, Vite, and React (Will probably move to Node.js). Currently at around 30+ API endpoints. It's capable of creating technicians and jobs (backend), managing them, assigning jobs to technicians based on skill, and tracking technicians locations, in addition to job states (backend & frontend). FieldOpt helps dispatchers and field service companies efficiently assign and route service jobs to technicians.
 
----
+<p align="center">
+	<img src="./assets/fieldopt-map.jpg" alt="Map View" width="200" /><br>
+</p><br>
+<table aligh="center">
+	<tr>
+		<td align="center">
+			<img src="./assets/fieldopt-dots.jpg" alt="Dot View" width="200"/><br/>
+			[Dot View]
+		</td>
+		<td align="center">
+			<img src="./assets/fieldopt-jobs.jpg" alt="Job View" width="200"/><br/>
+			[Job View]
+		</td>
+	</tr>
+		<tr>
+		<td align="center">
+			<img src="./assets/fieldopt-backend.jpg" alt="Backend View" width="200"/><br/>
+			[Swagger API Backend]
+		</td>
+		<td align="center">
+			<img src="./assets/fieldopt-json.jpg" alt="Backend JSON" width="200"/><br/>
+			[JSON Entry]
+		</td>
+	</tr>
+</table><br>
 
-## Change Log
-[v0.0.2]
+**Auto-Router**: Automatically assigns jobs to the best qualified technicians  
 
-- FastAPI + React integration; it isn't pretty but it's scaffolded
-- Technician + Job CRUD via API
-- Live frontend displaying job/tech tables; based on created jobs/techs
+**Skill-Based Matching**: Ensures technicians only get jobs they're qualified for (manual override capable)
 
----
+**Capacity Management**: Prevents overbooking by tracking tech workload
 
-## Usage
+## Launch FieldOpt
 
-### Backend
+### Requirements
 
-#### Clone the repo
+- Python 3.11+
+- pip, venv, and npm
+- Docker or PostgreSQL 15+
+
+### Run
+
+#### Backend
+
+Create virtual environment<br>
+Install dependencies<br>
+Start PostgreSQL via included docker yml or local install<br>
+Run server
 ```bash
-git clone https://github.com/zblauser/fieldopt.git
 cd fieldopt
-```
-
-#### Set up a virtual environment
-```bash
 python3 -m venv venv
-```
-```bash
-source venv/bin/activate <-- mac/linux
-venv\Scripts\activate <-- on windows
-```
 
-#### Install dependencies
-```bash
-pip install fastapi uvicorn sqlalchemy pydantic
+source venv/bin/activate  # macOS
+venv\Scripts\activate     # Windows
+
+pip install -r requirements.txt
+
+# For Docker
+<Start Docker>
+docker compose up -d postgres
+
+python -m uvicorn backend.api.main:app --reload
 ```
+#### Frontend
 
-#### Run the app
-```bash
-uvicorn app.main:app --reload
-```
-
-#### Open Swagger UI
-```
-http://localhost:8000/docs
-```
-
-#### While running:
-
-- Create technicians with skills and locations
-- Create service jobs with required skills and customer info
-- Auto-assign jobs to matching technicians
-- FSM job lifecycle: `pending → assigned → in_progress → completed`
-- Interactive API testing via Swagger UI
-
-### Frontend
+Install dependencies<br>
+Run server
 ```bash
 cd fieldopt/frontend
-```
-
-#### Install Dependencies
-```bash
 npm install
-```
-
-#### Start React Server
-```bash
 npm run dev
 ```
 
-#### Open Frontend UI
+#### Access the API
+API: http://localhost:8000 <br>
+Interactive Docs: http://localhost:8000/docs <br>
+Alternative Docs: http://localhost:8000/redoc <br>
+Frontend: http://localhost:5173 <br>
+
+#### Optional 
+
+##### Seeding a database
 ```bash
-http://localhost:5173
+cd fieldopt/backend/database/
+python -m backend.database.seeds.seed_data
+```
+##### Setting up an environment
+```bash
+cp .env.example .env
+# Edit .env (defaults work for development)
 ```
 
-### Notes
+## Routing
 
-- Built with Vite + Tailwind CSS
-- Requires FastAPI backend running at http://localhost:8000
+### Routing Modes
 
----
+- `standard` - Closest qualified tech
+- `load_balance` - Balances workload across all techs
+- `standard_by_timeslot` - Considers time slots (future enhancement)
 
-#### API Endpoints
+### Operation
 
-##### Technicians
-- `POST /technicians/`
-- `GET /technicians/`
+The routing engine considers multiple factors to find the best technician for each job:
 
-##### Jobs
-- `POST /jobs/`
-- `GET /jobs/`
-- `POST /jobs/{job_id}/assign`
-- `PATCH /jobs/{job_id}/start`
-- `PATCH /jobs/{job_id}/complete`
+1. **Skill**: Technician must have all required skills
+2. **Time**: Technician must have time available in their day
+3. **Capacity**: Won't overload a tech (configurable max jobs per day)
+4. **Distance**: Assigns closest qualified tech (in standard mode)
+5. **Priority**: VIP and high-priority jobs routed first
 
----
+## API Interaction
 
-## Current Timeline
+### Key Endpoints
 
-- Backend
-	- job cancellation						[ ]
-	- job reassignment						[ ]
-	- manual job assignment					[ ]
-	- tech coordinates (automatic/manual)	[ ]
-	- permissions							[ ]
+#### Technicians
+- `POST /api/v1/technicians/` - Create technician
+- `GET /api/v1/technicians/` - List all technicians
+- `GET /api/v1/technicians/available` - Get available techs
+- `PATCH /api/v1/technicians/{id}/location` - Update location
+- `PATCH /api/v1/technicians/{id}/status` - Update status
 
-- React Frontend
-	- drag/drop interface					[ ]
-	- map interface							[ ]
-	- cleaner interface						[ ]
+#### Jobs
+- `POST /api/v1/jobs/` - Create job
+- `GET /api/v1/jobs/` - List all jobs
+- `GET /api/v1/jobs/unassigned` - Get unassigned jobs
+- `PATCH /api/v1/jobs/{id}/start` - Start a job
+- `PATCH /api/v1/jobs/{id}/complete` - Complete a job
 
-- Mobile GUI
-	- tech endpoint							[ ]
-	- mobile job/tech manager				[ ]
- 
----
+#### Routing
+- `POST /api/v1/routing/auto-route` - Auto-assign all pending jobs
+- `POST /api/v1/routing/jobs/{id}/route` - Route single job
+- `POST /api/v1/routing/jobs/{id}/assign/{tech_id}` - Manual assign
+- `DELETE /api/v1/routing/jobs/{id}/unassign` - Unassign job
+- `POST /api/v1/routing/jobs/{id}/reassign/{tech_id}` - Reassign job
+
+
+## Configuration
+
+Edit `backend/.env` to customize routing behavior, time slots, etc.
+
+## Change Log
+
+### 0.0.3 (Latest)<br>
+Project restructuring + frontend
+- Fully backend-driven
+- PostgresSQL over SQLite
+- Beautiful and responsive map view, thanks to the OpenStreetMap library
+- Redesigned tailwind css vite + react frontend
+
+### Previous Versions
+<details>
+<summary>Previous Changes</summary>
+
+***0.0.2***<br>
+Started frontend
+- FastAPI + react integration; "it isn't pretty but it's scaffolded"
+- Technician + job CRUD via API
+- Technically live frontend that displays techs/jobs
+
+***0.0.1***<br>
+Initial commit
+- Basic backend logic
+- More of a proof of concept
+</details>
+
+## Roadmap
+[ ] Node.js Frontend<br>
+[ ] Update map for distace, real time traffic<br>
+[ ] Refine auto-dispatching<br>
+[ ] Mobile Technician App for communication with the API while dispatched 
 
 ## Contributing
+If you share the belief that simplicity empowers creativity, feel free to contribute.
 
-If you share the belief that simplicity empowers creativity, feel free to contribute. 
+#### Contribution is welcome in the form of
+- Forking this repo
+- Submitting a Pull Request
+- Bug reports and feature requests
 
-#### Contribution is welcome in the form of:              
-- Forking this repo                                       
-- Submiting a Pull Request                                
-- Bug reports and feature requests                        
-                                                          
-Please ensure your code follows the existing style.  
-
----
-
-## Thank you for your attention.                          
-If you hit any issues, feel free to open an issue on GitHub.                                                        
-Pull requests, suggestions, or even thoughtful discussions are welcome.
+Please ensure your code follows the existing style.
