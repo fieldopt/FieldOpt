@@ -5,7 +5,7 @@ An open source field service management system built using FastAPI, PostgresSQL,
 <p align="center">
 	<img src="./assets/fieldopt-map.jpg" alt="Map View" width="200" /><br>
 </p><br>
-<table aligh="center">
+<table align="center">
 	<tr>
 		<td align="center">
 			<img src="./assets/fieldopt-dots.jpg" alt="Dot View" width="200"/><br/>
