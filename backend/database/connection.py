@@ -1,68 +1,78 @@
 """
 Database Connection Management
-Handles SQLAlchemy engine, session creation, and database initialization
+Async SQLAlchemy engine, session creation, and database initialization
 """
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, Session
-from typing import Generator
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
+from typing import AsyncGenerator
 
 from backend.config import get_settings
 from backend.database.models import Base
 
 settings = get_settings()
 
-# Create database engine for PostgreSQL
-engine = create_engine(
-	settings.DATABASE_URL,
+# Build async URL — swap postgresql:// to postgresql+asyncpg://
+def _async_url(url: str) -> str:
+	if url.startswith("postgresql://"):
+		return url.replace("postgresql://", "postgresql+asyncpg://", 1)
+	if url.startswith("postgresql+psycopg2://"):
+		return url.replace("postgresql+psycopg2://", "postgresql+asyncpg://", 1)
+	return url
+
+engine = create_async_engine(
+	_async_url(settings.DATABASE_URL),
 	echo=settings.DATABASE_ECHO,
-	pool_pre_ping=True,  # Verify connections before using them
-	pool_size=10,  # Number of connections to maintain
-	max_overflow=20  # Max connections beyond pool_size
+	pool_pre_ping=True,
+	pool_size=10,
+	max_overflow=20,
 )
 
-# Create session factory
-SessionLocal = sessionmaker(
+AsyncSessionLocal = async_sessionmaker(
+	bind=engine,
+	class_=AsyncSession,
 	autocommit=False,
 	autoflush=False,
-	bind=engine
+	expire_on_commit=False,  # Prevents MissingGreenlet on post-commit attribute access
 )
 
 
-def init_db() -> None:
+async def init_db() -> None:
 	"""
-	Initialize database - create all tables
-	This should be called once at application startup
+	Initialize database — create all tables.
+	Called once at application startup.
 	"""
-	Base.metadata.create_all(bind=engine)
+	async with engine.begin() as conn:
+		await conn.run_sync(Base.metadata.create_all)
 	print("✅ Database tables created successfully")
 
 
-def get_db() -> Generator[Session, None, None]:
+async def get_db() -> AsyncGenerator[AsyncSession, None]:
 	"""
-	Dependency function to get database session
-	Use this in FastAPI route dependencies
-	
+	Async dependency that yields a database session.
+
 	Usage:
-		@app.get("/items")
-		def read_items(db: Session = Depends(get_db)):
-			return db.query(Item).all()
+		@router.get("/items")
+		async def read_items(db: AsyncSession = Depends(get_db)):
+			result = await db.execute(select(Item))
+			return result.scalars().all()
 	"""
-	db = SessionLocal()
-	try:
-		yield db
-	finally:
-		db.close()
+	async with AsyncSessionLocal() as session:
+		try:
+			yield session
+		except Exception:
+			await session.rollback()
+			raise
 
 
-def reset_db() -> None:
+async def reset_db() -> None:
 	"""
-	Drop all tables and recreate them
-	WARNING: This will delete all data!
-	Use only for development/testing
+	Drop all tables and recreate them.
+	WARNING: Destroys all data. Development/testing only.
 	"""
 	print("⚠️  Dropping all tables...")
-	Base.metadata.drop_all(bind=engine)
+	async with engine.begin() as conn:
+		await conn.run_sync(Base.metadata.drop_all)
 	print("✅ Tables dropped")
 	print("Creating tables...")
-	Base.metadata.create_all(bind=engine)
+	async with engine.begin() as conn:
+		await conn.run_sync(Base.metadata.create_all)
 	print("✅ Database reset complete")

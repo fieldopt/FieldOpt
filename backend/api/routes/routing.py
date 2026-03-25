@@ -2,7 +2,7 @@
 API routes for routing operations
 """
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.database.connection import get_db
 from backend.api.schemas import AutoRouteRequest, AutoRouteResponse, BestTechResponse
@@ -13,38 +13,38 @@ router = APIRouter()
 
 
 @router.post("/auto-route", response_model=AutoRouteResponse)
-def auto_route(route_request: AutoRouteRequest, db: Session = Depends(get_db)):
+async def auto_route(route_request: AutoRouteRequest, db: AsyncSession = Depends(get_db)):
 	"""
-	Automatically route pending jobs to available technicians
-	Based on WFX Auto-Route: considers skills, time, and distance
+	Automatically route pending jobs to available technicians.
+	Based on WFX Auto-Route: considers skills, capacity, and distance.
 	"""
-	result = auto_router.auto_route_jobs(db, target_date=route_request.target_date)
+	result = await auto_router.auto_route_jobs(db, target_date=route_request.target_date)
 	return AutoRouteResponse(**result)
 
 
 @router.get("/best-tech/{job_id}", response_model=BestTechResponse)
-def find_best_tech(job_id: int, db: Session = Depends(get_db)):
-	"""Find the best technician for a specific job"""
-	job = job_logic.get_job(db, job_id)
+async def find_best_tech(job_id: int, db: AsyncSession = Depends(get_db)):
+	"""Find the best available technician for a specific job"""
+	job = await job_logic.get_job(db, job_id)
 	if not job:
 		raise HTTPException(status_code=404, detail=f"Job {job_id} not found")
-	
-	result = auto_router.find_best_technician_for_job(db, job_id)
-	
+
+	result = await auto_router.find_best_technician_for_job(db, job_id)
+
 	if not result:
 		return BestTechResponse(
 			job_id=job_id,
 			technician_id=None,
 			technician_name=None,
 			distance=None,
-			has_match=False
+			has_match=False,
 		)
-	
+
 	tech, distance = result
 	return BestTechResponse(
 		job_id=job_id,
 		technician_id=tech.id,
 		technician_name=tech.name,
 		distance=distance,
-		has_match=True
+		has_match=True,
 	)

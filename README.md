@@ -1,6 +1,6 @@
 # FieldOpt
 ## Overview
-An open source field service management system built using FastAPI, PostgresSQL, Vite, and React (Will probably move to Node.js). Currently at around 30+ API endpoints. It's capable of creating technicians and jobs (backend), managing them, assigning jobs to technicians based on skill, and tracking technicians locations, in addition to job states (backend & frontend). FieldOpt helps dispatchers and field service companies efficiently assign and route service jobs to technicians.
+An open source field service management system built using FastAPI, PostgresSQL, Vite, and React. Currently at around 30+ API endpoints. It's capable of creating technicians and jobs (backend), managing them, assigning jobs to technicians based on skill, and tracking technicians locations, in addition to job states (backend & frontend). FieldOpt helps dispatchers and field service companies efficiently assign and route service jobs to technicians.
 
 <p align="center">
 	<img src="./assets/fieldopt-map.jpg" alt="Map View" width="200" /><br>
@@ -39,7 +39,7 @@ An open source field service management system built using FastAPI, PostgresSQL,
 ### Requirements
 
 - Python 3.11+
-- pip, venv, and npm
+- pip and npm
 - Docker or PostgreSQL 15+
 
 ### Run
@@ -51,19 +51,14 @@ Install dependencies<br>
 Start PostgreSQL via included docker yml or local install<br>
 Run server
 ```bash
-cd fieldopt
-python3 -m venv venv
-
-source venv/bin/activate  # macOS
-venv\Scripts\activate     # Windows
-
 pip install -r requirements.txt
 
 # For Docker
 <Start Docker>
 docker compose up -d postgres
 
-python -m uvicorn backend.api.main:app --reload
+cd fieldopt
+python -m uvicorn backend.api.main:app
 ```
 #### Frontend
 
@@ -144,16 +139,25 @@ Edit `backend/.env` to customize routing behavior, time slots, etc.
 
 ## Change Log
 
-### 0.0.3 (Latest)<br>
+### 0.0.4 (Latest)<br>
+Async backend migration + bug fixes
+- SQLAlchemy async engine with asyncpg
+- Fixed delete_technician, workload signature, reassign atomicity
+- Fixed get_jobs_summary filter bug
+- lazy="selectin" on all relationships
+- Routing now uses current tech location over home base
+- Frontend CSS fixes — Tailwind v4, full viewport layout
+
+### Previous Versions
+<details>
+<summary>Previous Changes</summary>
+
+***0.0.3***<br>
 Project restructuring + frontend
 - Fully backend-driven
 - PostgresSQL over SQLite
 - Beautiful and responsive map view, thanks to the OpenStreetMap library
 - Redesigned tailwind css vite + react frontend
-
-### Previous Versions
-<details>
-<summary>Previous Changes</summary>
 
 ***0.0.2***<br>
 Started frontend
@@ -168,10 +172,11 @@ Initial commit
 </details>
 
 ## Roadmap
-[ ] Node.js Frontend<br>
-[ ] Update map for distace, real time traffic<br>
-[ ] Refine auto-dispatching<br>
-[ ] Mobile Technician App for communication with the API while dispatched 
+[ ] Docker compose full stack (frontend + backend + postgres)<br>
+[ ] WebSocket real-time dispatch updates<br>
+[ ] Dispatch dashboard with live counters
+[ ] Mobile technician PWA<br>
+[ ] Refine auto-dispatching
 
 ## Contributing
 If you share the belief that simplicity empowers creativity, feel free to contribute.
