@@ -1,38 +1,35 @@
 # FieldOpt
-## Overview
-An open source field service management system built using FastAPI, PostgresSQL, Vite, and React. Currently at around 30+ API endpoints. It's capable of creating technicians and jobs (backend), managing them, assigning jobs to technicians based on skill, and tracking technicians locations, in addition to job states (backend & frontend). FieldOpt helps dispatchers and field service companies efficiently assign and route service jobs to technicians.
 
-<p align="center">
-	<img src="./assets/fieldopt-map.jpg" alt="Map View" width="200" /><br>
-</p><br>
+## Overview
+
+An open-source field service management system built with FastAPI, PostgreSQL, Vite, and React. FieldOpt is an enterprise-grade dispatch console designed for dispatchers and field service companies to efficiently assign, route, and manage service jobs across a workforce of field technicians.
+
 <table align="center">
 	<tr>
-		<td align="center">
-			<img src="./assets/fieldopt-dots.jpg" alt="Dot View" width="200"/><br/>
-			[Dot View]
-		</td>
-		<td align="center">
-			<img src="./assets/fieldopt-jobs.jpg" alt="Job View" width="200"/><br/>
-			[Job View]
+		<td colspan="2" align="center">
+			<img src="./assets/dashboard.png" alt="Dashboard" width="400"/><br/>
+			[Dashboard]
 		</td>
 	</tr>
-		<tr>
+	<tr>
 		<td align="center">
-			<img src="./assets/fieldopt-backend.jpg" alt="Backend View" width="200"/><br/>
-			[Swagger API Backend]
+			<img src="./assets/map.png" alt="Map View" width="200"/><br/>
+			[Map View]
 		</td>
 		<td align="center">
-			<img src="./assets/fieldopt-json.jpg" alt="Backend JSON" width="200"/><br/>
-			[JSON Entry]
+			<img src="./assets/assign.png" alt="Assign Jobs" width="200"/><br/>
+			[Assign Jobs]
 		</td>
 	</tr>
 </table><br>
 
-**Auto-Router**: Automatically assigns jobs to the best qualified technicians  
+**Auto-Router** — Automatically assigns jobs to the best qualified technicians
 
-**Skill-Based Matching**: Ensures technicians only get jobs they're qualified for (manual override capable)
+**Skill-Based Matching** — Ensures technicians only get jobs they're qualified for (manual override capable)
 
-**Capacity Management**: Prevents overbooking by tracking tech workload
+**Capacity Management** — Prevents overbooking by tracking tech workload
+
+**Enterprise Dispatch Console** — AG Grid-powered split-pane layout with right-click context menus, drag-and-drop assignment, clickable dashboard indicators, and a floating map window
 
 ## Launch FieldOpt
 
@@ -46,107 +43,127 @@ An open source field service management system built using FastAPI, PostgresSQL,
 
 #### Backend
 
-Create virtual environment<br>
-Install dependencies<br>
-Start PostgreSQL via included docker yml or local install<br>
-Run server
 ```bash
+cd fieldopt
 pip install -r requirements.txt
 
-# For Docker
-<Start Docker>
+# Start PostgreSQL
 docker compose up -d postgres
 
-cd fieldopt
-python -m uvicorn backend.api.main:app
+# Start the API
+python -m uvicorn backend.api.main:app --reload
 ```
+
 #### Frontend
 
-Install dependencies<br>
-Run server
 ```bash
 cd fieldopt/frontend
 npm install
 npm run dev
 ```
 
-#### Access the API
-API: http://localhost:8000 <br>
-Interactive Docs: http://localhost:8000/docs <br>
-Alternative Docs: http://localhost:8000/redoc <br>
-Frontend: http://localhost:5173 <br>
+#### Access
 
-#### Optional 
+| Service | URL |
+|---------|-----|
+| Frontend | http://localhost:5173 |
+| API | http://localhost:8000 |
+| Swagger Docs | http://localhost:8000/docs |
+| ReDoc | http://localhost:8000/redoc |
 
-##### Seeding a database
+#### Seed & Reset
+
 ```bash
-cd fieldopt/backend/database/
+# Seed the database with sample data
 python -m backend.database.seeds.seed_data
+
+# Reset database (drop all tables + reseed)
+python -m backend.database.reset_db
+
+# Reset database (empty, no seed data)
+python -m backend.database.reset_db --empty
 ```
-##### Setting up an environment
+
+#### Environment
+
 ```bash
 cp .env.example .env
-# Edit .env (defaults work for development)
+# Edit .env — defaults work for development
 ```
 
 ## Routing
 
 ### Routing Modes
 
-- `standard` - Closest qualified tech
-- `load_balance` - Balances workload across all techs
-- `standard_by_timeslot` - Considers time slots (future enhancement)
+- `standard` — Closest qualified tech
+- `load_balance` — Distributes workload across all techs
+- `standard_by_timeslot` — Considers time slots (future enhancement)
 
-### Operation
+### How It Works
 
-The routing engine considers multiple factors to find the best technician for each job:
+The routing engine evaluates multiple factors to find the best technician for each job:
 
-1. **Skill**: Technician must have all required skills
-2. **Time**: Technician must have time available in their day
-3. **Capacity**: Won't overload a tech (configurable max jobs per day)
-4. **Distance**: Assigns closest qualified tech (in standard mode)
-5. **Priority**: VIP and high-priority jobs routed first
+1. **Skill** — Technician must have all required skills
+2. **Time** — Technician must have time available in their shift
+3. **Capacity** — Won't exceed configurable max jobs per day
+4. **Distance** — Assigns closest qualified tech (in standard mode)
+5. **Priority** — VIP and high-priority jobs routed first
 
-## API Interaction
+## API
 
 ### Key Endpoints
 
 #### Technicians
-- `POST /api/v1/technicians/` - Create technician
-- `GET /api/v1/technicians/` - List all technicians
-- `GET /api/v1/technicians/available` - Get available techs
-- `PATCH /api/v1/technicians/{id}/location` - Update location
-- `PATCH /api/v1/technicians/{id}/status` - Update status
+- `POST /api/v1/technicians/` — Create technician
+- `GET /api/v1/technicians/` — List all technicians
+- `GET /api/v1/technicians/available` — Get available techs
+- `PATCH /api/v1/technicians/{id}/location` — Update location
+- `PATCH /api/v1/technicians/{id}/status` — Update status
+- `GET /api/v1/technicians/{id}/workload` — Get workload
 
 #### Jobs
-- `POST /api/v1/jobs/` - Create job
-- `GET /api/v1/jobs/` - List all jobs
-- `GET /api/v1/jobs/unassigned` - Get unassigned jobs
-- `PATCH /api/v1/jobs/{id}/start` - Start a job
-- `PATCH /api/v1/jobs/{id}/complete` - Complete a job
+- `POST /api/v1/jobs/` — Create job
+- `GET /api/v1/jobs/` — List all jobs
+- `GET /api/v1/jobs/pending` — Get unassigned jobs
+- `GET /api/v1/jobs/summary` — Job counts by status
+- `POST /api/v1/jobs/{id}/start` — Start a job
+- `POST /api/v1/jobs/{id}/complete` — Complete a job
+- `POST /api/v1/jobs/{id}/cancel` — Cancel a job
+- `GET /api/v1/jobs/{id}/can-do/{tech_id}` — Check tech qualification
+
+#### Assignments
+- `POST /api/v1/assignments/` — Assign job to tech
+- `POST /api/v1/assignments/unassign` — Unassign a job
+- `POST /api/v1/assignments/reassign` — Reassign to different tech
 
 #### Routing
-- `POST /api/v1/routing/auto-route` - Auto-assign all pending jobs
-- `POST /api/v1/routing/jobs/{id}/route` - Route single job
-- `POST /api/v1/routing/jobs/{id}/assign/{tech_id}` - Manual assign
-- `DELETE /api/v1/routing/jobs/{id}/unassign` - Unassign job
-- `POST /api/v1/routing/jobs/{id}/reassign/{tech_id}` - Reassign job
-
-
-## Configuration
-
-Edit `backend/.env` to customize routing behavior, time slots, etc.
+- `POST /api/v1/routing/auto-route` — Auto-assign all pending jobs
+- `GET /api/v1/routing/best-tech/{job_id}` — Find best tech for a job
 
 ## Change Log
 
-### 0.0.4 (Latest)<br>
+### 0.0.5 (Latest)
+Complete frontend redesign — enterprise dispatch console
+
+- AG Grid-powered split-pane layout (technicians top, jobs bottom)
+- Draggable divider between panes
+- Right-click context menus with skill-filtered tech assignment
+- Clickable dashboard indicator bar (filters grids by status)
+- Floating, draggable, resizable map window (Leaflet)
+- Toast notifications on all dispatch actions
+- Keyboard shortcuts (R = refresh, M = map, Esc = close)
+- Dropped Tailwind — handwritten enterprise CSS with dark theme
+- Expanded API client (all endpoints wired)
+- Jazz-themed seed data
+
+### 0.0.4
 Async backend migration + bug fixes
+
 - SQLAlchemy async engine with asyncpg
 - Fixed delete_technician, workload signature, reassign atomicity
 - Fixed get_jobs_summary filter bug
 - lazy="selectin" on all relationships
 - Routing now uses current tech location over home base
-- Frontend CSS fixes — Tailwind v4, full viewport layout
 
 ### Previous Versions
 <details>
@@ -155,35 +172,42 @@ Async backend migration + bug fixes
 ***0.0.3***<br>
 Project restructuring + frontend
 - Fully backend-driven
-- PostgresSQL over SQLite
-- Beautiful and responsive map view, thanks to the OpenStreetMap library
-- Redesigned tailwind css vite + react frontend
+- PostgreSQL over SQLite
+- Map view via OpenStreetMap/Leaflet
+- Vite + React + Tailwind frontend
 
 ***0.0.2***<br>
 Started frontend
-- FastAPI + react integration; "it isn't pretty but it's scaffolded"
+- FastAPI + React integration
 - Technician + job CRUD via API
-- Technically live frontend that displays techs/jobs
+- Basic frontend displaying techs/jobs
 
 ***0.0.1***<br>
 Initial commit
 - Basic backend logic
-- More of a proof of concept
+- Proof of concept
 </details>
 
 ## Roadmap
-[ ] Docker compose full stack (frontend + backend + postgres)<br>
-[ ] WebSocket real-time dispatch updates<br>
-[ ] Dispatch dashboard with live counters
-[ ] Mobile technician PWA<br>
-[ ] Refine auto-dispatching
+
+- [ ] Drag-and-drop job assignment (cross-grid drop detection)
+- [ ] CanDo column (skill/route/time check indicators per WFX)
+- [ ] Dark/light theme toggle
+- [ ] Account system with role-based access
+- [ ] Column state persistence per user
+- [ ] Automated dispatch (job drip — system assigns jobs as they arrive)
+- [ ] Route criteria / designated tech zones
+- [ ] WebSocket real-time updates
+- [ ] Mobile technician PWA
+- [ ] Docker compose full stack
 
 ## Contributing
+
 If you share the belief that simplicity empowers creativity, feel free to contribute.
 
-#### Contribution is welcome in the form of
-- Forking this repo
-- Submitting a Pull Request
+- Fork this repo
+- Submit a Pull Request
 - Bug reports and feature requests
 
 Please ensure your code follows the existing style.
+
