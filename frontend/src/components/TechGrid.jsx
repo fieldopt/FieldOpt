@@ -1,4 +1,4 @@
-import { useMemo, useRef, useCallback } from 'react';
+import { useMemo, useRef, useCallback, useEffect } from 'react';
 import { AgGridReact } from 'ag-grid-react';
 import { AllCommunityModule, ModuleRegistry } from 'ag-grid-community';
 
@@ -29,8 +29,8 @@ function ShiftCellRenderer({ data }) {
 
 function JobCountCellRenderer({ data }) {
 	if (!data) return null;
-	const assigned = data.assignments?.length ?? 0;
-	const completed = data.assignments?.filter?.((a) => a.job?.status === 'completed')?.length ?? 0;
+	const assigned = data.assigned_jobs ?? 0;
+	const completed = data.completed_jobs ?? 0;
 	return (
 		<span style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--font-size-xs)' }}>
 			{assigned}<span style={{ color: 'var(--text-muted)' }}>:</span>{completed}
@@ -38,50 +38,86 @@ function JobCountCellRenderer({ data }) {
 	);
 }
 
-export default function TechGrid({ technicians, onContextMenu, isDragTarget }) {
+export default function TechGrid({ technicians, selectedIds = [], onRowClicked, onContextMenu, isDragTarget }) {
 	const gridRef = useRef(null);
+	const containerRef = useRef(null);
 
 	const columnDefs = useMemo(() => [
 		{
-			headerName: 'Tech ID',
-			width: 85,
-			pinned: 'left',
-			sort: 'asc',
-			valueGetter: (params) => params.data?.employee_id || String(params.data?.id),
+			headerName: 'Tech ID', width: 85, pinned: 'left', sort: 'asc',
+			valueGetter: (p) => p.data?.employee_id || String(p.data?.id),
 			cellStyle: { fontFamily: 'var(--font-mono)', fontSize: 'var(--font-size-xs)' },
 		},
 		{ field: 'name', headerName: 'Name', minWidth: 150, flex: 1, pinned: 'left' },
 		{ field: 'status', headerName: 'Status', width: 110, cellRenderer: StatusCellRenderer },
 		{
 			headerName: 'Shift', width: 110, cellRenderer: ShiftCellRenderer,
-			valueGetter: (params) => params.data?.shift_start ? `${params.data.shift_start}-${params.data.shift_end}` : '',
+			valueGetter: (p) => p.data?.shift_start ? `${p.data.shift_start}-${p.data.shift_end}` : '',
 		},
 		{
 			headerName: 'Jobs A:C', width: 85, cellRenderer: JobCountCellRenderer,
-			valueGetter: (params) => params.data?.assignments?.length ?? 0,
+			valueGetter: (p) => (p.data?.assigned_jobs ?? 0) + (p.data?.completed_jobs ?? 0),
 		},
 		{
 			field: 'max_jobs_per_day', headerName: 'Max', width: 55,
 			cellStyle: { fontFamily: 'var(--font-mono)', fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)' },
 		},
-		{ field: 'skills', headerName: 'Skills', minWidth: 180, flex: 1, cellRenderer: SkillsCellRenderer },
-		{ field: 'phone', headerName: 'Phone', width: 120, cellStyle: { fontSize: 'var(--font-size-xs)', color: 'var(--text-secondary)' } },
+		{
+			field: 'skills', headerName: 'Skills', minWidth: 180, flex: 1,
+			cellRenderer: SkillsCellRenderer,
+			valueFormatter: (p) => p.value?.join(', ') ?? '',
+		},
+		{
+			field: 'phone', headerName: 'Phone', width: 120,
+			cellStyle: { fontSize: 'var(--font-size-xs)', color: 'var(--text-secondary)' },
+		},
 	], []);
 
 	const defaultColDef = useMemo(() => ({ sortable: true, resizable: true, suppressMovable: false }), []);
 
-	const onCellContextMenu = useCallback((params) => {
-		if (params.event && params.data && onContextMenu) onContextMenu(params.event, params.data);
+	const rowSelection = useMemo(() => ({
+		mode: 'multiRow',
+		checkboxes: false,
+		headerCheckbox: false,
+		enableClickSelection: false,
+	}), []);
+
+	// Sync AG Grid's internal selection with our selectedIds prop
+	useEffect(() => {
+		const gridApi = gridRef.current?.api;
+		if (!gridApi) return;
+		gridApi.deselectAll();
+		if (selectedIds.length > 0) {
+			gridApi.forEachNode((node) => {
+				if (node.data && selectedIds.includes(node.data.id)) {
+					node.setSelected(true, false, 'api');
+				}
+			});
+		}
+	}, [selectedIds, technicians]);
+
+	const onCellContextMenu = useCallback((p) => {
+		if (p.event && p.data && onContextMenu) onContextMenu(p.event, p.data);
 	}, [onContextMenu]);
 
-	// Stamp each row with data-tech-id so the drag system can identify the drop target
-	const onRowDataUpdated = useCallback(() => {
+	const handleRowClicked = useCallback((p) => {
+		if (p.data && onRowClicked) {
+			// Get the current displayed order from AG Grid (respects sorting)
+			const displayedIds = [];
+			gridRef.current?.api?.forEachNodeAfterFilterAndSort((node) => {
+				if (node.data) displayedIds.push(node.data.id);
+			});
+			onRowClicked(p.data.id, p.event, displayedIds);
+		}
+	}, [onRowClicked]);
+
+	// Stamp data-tech-id on rows for drag-drop target detection
+	const stampTechIds = useCallback(() => {
 		requestAnimationFrame(() => {
 			const gridApi = gridRef.current?.api;
-			if (!gridApi) return;
-			const container = gridRef.current?.eGridDiv;
-			if (!container) return;
-			container.querySelectorAll('.ag-row').forEach((rowEl) => {
+			const el = containerRef.current;
+			if (!gridApi || !el) return;
+			el.querySelectorAll('.ag-row').forEach((rowEl) => {
 				const idx = Number(rowEl.getAttribute('row-index'));
 				const node = gridApi.getDisplayedRowAtIndex(idx);
 				if (node?.data) rowEl.setAttribute('data-tech-id', String(node.data.id));
@@ -90,24 +126,31 @@ export default function TechGrid({ technicians, onContextMenu, isDragTarget }) {
 	}, []);
 
 	return (
-		<div className={`ag-theme-fieldopt${isDragTarget ? ' drop-target-active' : ''}`} style={{ width: '100%', height: '100%' }}>
+		<div
+			ref={containerRef}
+			className={`ag-theme-fieldopt${isDragTarget ? ' drop-target-active' : ''}`}
+			style={{ width: '100%', height: '100%' }}
+		>
 			<AgGridReact
 				ref={gridRef}
 				rowData={technicians}
 				columnDefs={columnDefs}
 				defaultColDef={defaultColDef}
-				getRowId={(params) => String(params.data.id)}
-				rowSelection="single"
+				getRowId={(p) => String(p.data.id)}
+				rowSelection={rowSelection}
+				selectionColumnDef={null}
 				animateRows={false}
 				headerHeight={28}
 				rowHeight={26}
 				suppressCellFocus={true}
 				onCellContextMenu={onCellContextMenu}
+				onRowClicked={handleRowClicked}
 				preventDefaultOnContextMenu={true}
-				onRowDataUpdated={onRowDataUpdated}
-				onFirstDataRendered={onRowDataUpdated}
-				onSortChanged={onRowDataUpdated}
-				onFilterChanged={onRowDataUpdated}
+				onRowDataUpdated={stampTechIds}
+				onFirstDataRendered={stampTechIds}
+				onSortChanged={stampTechIds}
+				onFilterChanged={stampTechIds}
+				onBodyScroll={stampTechIds}
 			/>
 		</div>
 	);

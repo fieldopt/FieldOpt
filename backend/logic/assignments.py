@@ -18,7 +18,6 @@ async def create_assignment(
 	sequence: Optional[int] = None,
 ) -> Assignment:
 	"""Create a new assignment linking a job to a technician"""
-	# Check if job is already assigned
 	existing_result = await db.execute(
 		select(Assignment).where(Assignment.job_id == job_id)
 	)
@@ -26,7 +25,6 @@ async def create_assignment(
 	if existing:
 		raise ValueError(f"Job {job_id} is already assigned to technician {existing.technician_id}")
 
-	# Get job and technician
 	job_result = await db.execute(select(Job).where(Job.id == job_id))
 	job = job_result.scalar_one_or_none()
 
@@ -38,7 +36,6 @@ async def create_assignment(
 	if not tech:
 		raise ValueError(f"Technician {technician_id} not found")
 
-	# Use current location if available, otherwise fall back to home base
 	origin_lat = tech.current_latitude if tech.current_latitude is not None else tech.home_latitude
 	origin_lon = tech.current_longitude if tech.current_longitude is not None else tech.home_longitude
 
@@ -114,12 +111,8 @@ async def reassign_job(
 ) -> Assignment:
 	"""
 	Reassign a job to a different technician.
-
-	FIX: Old version called unassign_job() then create_assignment() as two
-	separate commits — a failure between them would leave the job unassigned
-	with no assignment record. Now runs as a single atomic transaction.
+	Runs as a single atomic transaction.
 	"""
-	# Remove existing assignment within the same session (no commit yet)
 	assignment_result = await db.execute(
 		select(Assignment).where(Assignment.job_id == job_id)
 	)
@@ -127,7 +120,6 @@ async def reassign_job(
 	if existing:
 		await db.delete(existing)
 
-	# Get job and new technician
 	job_result = await db.execute(select(Job).where(Job.id == job_id))
 	job = job_result.scalar_one_or_none()
 	if not job:
@@ -138,7 +130,6 @@ async def reassign_job(
 	if not tech:
 		raise ValueError(f"Technician {new_technician_id} not found")
 
-	# Use current location if available, otherwise home base
 	origin_lat = tech.current_latitude if tech.current_latitude is not None else tech.home_latitude
 	origin_lon = tech.current_longitude if tech.current_longitude is not None else tech.home_longitude
 
@@ -155,7 +146,100 @@ async def reassign_job(
 	job.status = JobStatus.ASSIGNED
 
 	db.add(new_assignment)
-	await db.commit()  # Single commit — atomic
+	await db.commit()
 	await db.refresh(new_assignment)
 
 	return new_assignment
+
+
+async def batch_assign(
+	db: AsyncSession,
+	job_ids: List[int],
+	technician_id: int,
+) -> dict:
+	"""
+	Assign multiple jobs to a single technician in one transaction.
+	Skips jobs that are already assigned (doesn't error).
+	Returns count of successful assignments.
+	"""
+	tech_result = await db.execute(select(Technician).where(Technician.id == technician_id))
+	tech = tech_result.scalar_one_or_none()
+	if not tech:
+		raise ValueError(f"Technician {technician_id} not found")
+
+	origin_lat = tech.current_latitude if tech.current_latitude is not None else tech.home_latitude
+	origin_lon = tech.current_longitude if tech.current_longitude is not None else tech.home_longitude
+
+	assigned = 0
+	skipped = 0
+	errors = []
+
+	for job_id in job_ids:
+		try:
+			# Check existing assignment
+			existing_result = await db.execute(
+				select(Assignment).where(Assignment.job_id == job_id)
+			)
+			existing = existing_result.scalar_one_or_none()
+
+			if existing:
+				# Reassign — delete old, create new
+				await db.delete(existing)
+
+			job_result = await db.execute(select(Job).where(Job.id == job_id))
+			job = job_result.scalar_one_or_none()
+			if not job:
+				errors.append(f"Job {job_id} not found")
+				skipped += 1
+				continue
+
+			distance = haversine_distance(origin_lat, origin_lon, job.latitude, job.longitude)
+			travel_time = calculate_travel_time(distance)
+
+			assignment = Assignment(
+				job_id=job_id,
+				technician_id=technician_id,
+				estimated_distance=distance,
+				estimated_travel_time=travel_time,
+			)
+			job.status = JobStatus.ASSIGNED
+			db.add(assignment)
+			assigned += 1
+		except Exception as e:
+			errors.append(f"Job {job_id}: {str(e)}")
+			skipped += 1
+
+	await db.commit()
+	return {"assigned": assigned, "skipped": skipped, "errors": errors}
+
+
+async def batch_unassign(
+	db: AsyncSession,
+	job_ids: List[int],
+) -> dict:
+	"""
+	Unassign multiple jobs in one transaction.
+	Returns count of successful unassignments.
+	"""
+	unassigned = 0
+	skipped = 0
+
+	for job_id in job_ids:
+		assignment_result = await db.execute(
+			select(Assignment).where(Assignment.job_id == job_id)
+		)
+		assignment = assignment_result.scalar_one_or_none()
+		if not assignment:
+			skipped += 1
+			continue
+
+		job_result = await db.execute(select(Job).where(Job.id == job_id))
+		job = job_result.scalar_one_or_none()
+		if job:
+			job.status = JobStatus.PENDING
+
+		await db.delete(assignment)
+		unassigned += 1
+
+	await db.commit()
+	return {"unassigned": unassigned, "skipped": skipped}

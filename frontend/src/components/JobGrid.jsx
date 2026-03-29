@@ -1,4 +1,4 @@
-import { useMemo, useRef, useCallback } from 'react';
+import { useMemo, useRef, useCallback, useEffect } from 'react';
 import { AgGridReact } from 'ag-grid-react';
 import { AllCommunityModule, ModuleRegistry } from 'ag-grid-community';
 
@@ -58,18 +58,25 @@ function DateCellRenderer({ value }) {
 	);
 }
 
-export default function JobGrid({ jobs, technicians, onContextMenu, onDragStart }) {
+export default function JobGrid({ jobs, selectedIds = [], onRowClicked, onContextMenu, onDragStart }) {
 	const gridRef = useRef(null);
-	const dragStartPos = useRef(null);
 
 	const columnDefs = useMemo(() => [
 		{
 			headerName: 'Job ID', width: 85, pinned: 'left', sort: 'asc',
-			valueGetter: (params) => params.data?.job_number || String(params.data?.id),
+			valueGetter: (p) => p.data?.job_number || String(p.data?.id),
 			cellStyle: { fontFamily: 'var(--font-mono)', fontSize: 'var(--font-size-xs)' },
 		},
 		{ field: 'job_type', headerName: 'Type', width: 100, cellRenderer: JobTypeCellRenderer },
 		{ field: 'status', headerName: 'Status', width: 110, cellRenderer: StatusCellRenderer },
+		{
+			field: 'assigned_tech_name', headerName: 'Tech', width: 110,
+			cellStyle: (p) => ({
+				fontSize: 'var(--font-size-xs)',
+				color: p.value ? 'var(--text-primary)' : 'var(--text-muted)',
+			}),
+			valueFormatter: (p) => p.value || '—',
+		},
 		{ field: 'priority', headerName: 'Pri', width: 50, cellRenderer: PriorityCellRenderer },
 		{ field: 'customer_name', headerName: 'Customer', minWidth: 140, flex: 1 },
 		{
@@ -87,57 +94,87 @@ export default function JobGrid({ jobs, technicians, onContextMenu, onDragStart 
 		{ field: 'scheduled_date', headerName: 'Date', width: 65, cellRenderer: DateCellRenderer },
 		{
 			headerName: 'Time Slot', width: 105, cellRenderer: TimeSlotCellRenderer,
-			valueGetter: (params) => params.data?.time_slot_start ? `${params.data.time_slot_start}-${params.data.time_slot_end}` : '',
+			valueGetter: (p) => p.data?.time_slot_start ? `${p.data.time_slot_start}-${p.data.time_slot_end}` : '',
 		},
 		{ field: 'estimated_duration', headerName: 'Dur', width: 65, cellRenderer: DurationCellRenderer },
-		{ field: 'required_skills', headerName: 'Skills', minWidth: 150, flex: 1, cellRenderer: SkillsCellRenderer },
+		{
+			field: 'required_skills', headerName: 'Skills', minWidth: 150, flex: 1,
+			cellRenderer: SkillsCellRenderer,
+			valueFormatter: (p) => p.value?.join(', ') ?? '',
+		},
 	], []);
 
 	const defaultColDef = useMemo(() => ({ sortable: true, resizable: true, suppressMovable: false }), []);
 
-	const onCellContextMenu = useCallback((params) => {
-		if (params.event && params.data && onContextMenu) onContextMenu(params.event, params.data);
+	const rowSelection = useMemo(() => ({
+		mode: 'multiRow',
+		checkboxes: false,
+		headerCheckbox: false,
+		enableClickSelection: false,
+	}), []);
+
+	// Sync AG Grid selection with our selectedIds prop
+	useEffect(() => {
+		const gridApi = gridRef.current?.api;
+		if (!gridApi) return;
+		gridApi.deselectAll();
+		if (selectedIds.length > 0) {
+			gridApi.forEachNode((node) => {
+				if (node.data && selectedIds.includes(node.data.id)) {
+					node.setSelected(true, false, 'api');
+				}
+			});
+		}
+	}, [selectedIds, jobs]);
+
+	const onCellContextMenu = useCallback((p) => {
+		if (p.event && p.data && onContextMenu) onContextMenu(p.event, p.data);
 	}, [onContextMenu]);
 
-	// --- Custom drag: mousedown starts tracking, only fires drag if mouse moves 5+ px ---
+	const handleRowClicked = useCallback((p) => {
+		if (p.data && onRowClicked) {
+			const displayedIds = [];
+			gridRef.current?.api?.forEachNodeAfterFilterAndSort((node) => {
+				if (node.data) displayedIds.push(node.data.id);
+			});
+			onRowClicked(p.data.id, p.event, displayedIds);
+		}
+	}, [onRowClicked]);
+
+	// Drag initiation — simple mousedown with 8px threshold
 	const handleMouseDown = useCallback((e) => {
-		// Only left mouse button, skip if clicking on scrollbar or header
 		if (e.button !== 0) return;
+		if (e.target.closest('.ag-header')) return;
+		if (e.target.closest('.ag-horizontal-right-spacer')) return;
 		const rowEl = e.target.closest('.ag-row');
 		if (!rowEl) return;
 
-		dragStartPos.current = { x: e.clientX, y: e.clientY, rowEl };
+		const startX = e.clientX;
+		const startY = e.clientY;
+		let fired = false;
 
-		const handleMouseMoveCheck = (ev) => {
-			if (!dragStartPos.current) return;
-			const dx = ev.clientX - dragStartPos.current.x;
-			const dy = ev.clientY - dragStartPos.current.y;
-			// Only start drag if moved 5+ pixels (prevents accidental drags on click)
-			if (Math.abs(dx) + Math.abs(dy) > 5) {
-				const rowIndex = Number(dragStartPos.current.rowEl.getAttribute('row-index'));
-				const gridApi = gridRef.current?.api;
-				if (gridApi) {
-					const node = gridApi.getDisplayedRowAtIndex(rowIndex);
-					if (node?.data && onDragStart) {
-						onDragStart(node.data);
-					}
+		const onMove = (ev) => {
+			if (fired) return;
+			if (Math.abs(ev.clientX - startX) + Math.abs(ev.clientY - startY) > 8) {
+				fired = true;
+				const idx = Number(rowEl.getAttribute('row-index'));
+				const node = gridRef.current?.api?.getDisplayedRowAtIndex(idx);
+				if (node?.data && onDragStart) {
+					// Prevent text selection immediately
+					document.body.style.userSelect = 'none';
+					document.body.style.cursor = 'grabbing';
+					onDragStart(node.data);
 				}
-				cleanup();
+				document.removeEventListener('mousemove', onMove);
+				document.removeEventListener('mouseup', onUp);
 			}
 		};
-
-		const handleMouseUpCancel = () => {
-			cleanup();
+		const onUp = () => {
+			document.removeEventListener('mousemove', onMove);
+			document.removeEventListener('mouseup', onUp);
 		};
-
-		const cleanup = () => {
-			dragStartPos.current = null;
-			document.removeEventListener('mousemove', handleMouseMoveCheck);
-			document.removeEventListener('mouseup', handleMouseUpCancel);
-		};
-
-		document.addEventListener('mousemove', handleMouseMoveCheck);
-		document.addEventListener('mouseup', handleMouseUpCancel);
+		document.addEventListener('mousemove', onMove);
+		document.addEventListener('mouseup', onUp);
 	}, [onDragStart]);
 
 	return (
@@ -151,13 +188,15 @@ export default function JobGrid({ jobs, technicians, onContextMenu, onDragStart 
 				rowData={jobs}
 				columnDefs={columnDefs}
 				defaultColDef={defaultColDef}
-				getRowId={(params) => String(params.data.id)}
-				rowSelection="single"
+				getRowId={(p) => String(p.data.id)}
+				rowSelection={rowSelection}
+				selectionColumnDef={null}
 				animateRows={false}
 				headerHeight={28}
 				rowHeight={26}
 				suppressCellFocus={true}
 				onCellContextMenu={onCellContextMenu}
+				onRowClicked={handleRowClicked}
 				preventDefaultOnContextMenu={true}
 			/>
 		</div>

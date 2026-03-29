@@ -34,7 +34,7 @@ async def create_technician(tech_data: TechnicianCreate, db: AsyncSession = Depe
 			shift_end=tech_data.shift_end,
 			max_jobs_per_day=tech_data.max_jobs_per_day,
 		)
-		return technician
+		return TechnicianResponse.from_orm_with_counts(technician)
 	except Exception as e:
 		raise HTTPException(status_code=400, detail=str(e))
 
@@ -45,14 +45,16 @@ async def get_technicians(
 	limit: int = Query(100, ge=1, le=500),
 	db: AsyncSession = Depends(get_db),
 ):
-	"""Get all technicians"""
-	return await tech_logic.get_all_technicians(db, skip=skip, limit=limit)
+	"""Get all technicians with job counts"""
+	techs = await tech_logic.get_all_technicians(db, skip=skip, limit=limit)
+	return [TechnicianResponse.from_orm_with_counts(t) for t in techs]
 
 
 @router.get("/available", response_model=List[TechnicianResponse])
 async def get_available_technicians(db: AsyncSession = Depends(get_db)):
 	"""Get all available technicians"""
-	return await tech_logic.get_available_technicians(db)
+	techs = await tech_logic.get_available_technicians(db)
+	return [TechnicianResponse.from_orm_with_counts(t) for t in techs]
 
 
 @router.get("/{tech_id}", response_model=TechnicianResponse)
@@ -61,7 +63,7 @@ async def get_technician(tech_id: int, db: AsyncSession = Depends(get_db)):
 	technician = await tech_logic.get_technician(db, tech_id)
 	if not technician:
 		raise HTTPException(status_code=404, detail=f"Technician {tech_id} not found")
-	return technician
+	return TechnicianResponse.from_orm_with_counts(technician)
 
 
 @router.patch("/{tech_id}", response_model=TechnicianResponse)
@@ -76,7 +78,8 @@ async def update_technician(
 		raise HTTPException(status_code=404, detail=f"Technician {tech_id} not found")
 
 	update_data = tech_data.model_dump(exclude_unset=True)
-	return await tech_logic.update_technician(db, tech_id, **update_data)
+	updated = await tech_logic.update_technician(db, tech_id, **update_data)
+	return TechnicianResponse.from_orm_with_counts(updated)
 
 
 @router.patch("/{tech_id}/location", response_model=TechnicianResponse)
@@ -87,14 +90,11 @@ async def update_technician_location(
 ):
 	"""Update technician's current location"""
 	technician = await tech_logic.update_technician_location(
-		db,
-		tech_id,
-		location_data.latitude,
-		location_data.longitude,
+		db, tech_id, location_data.latitude, location_data.longitude,
 	)
 	if not technician:
 		raise HTTPException(status_code=404, detail=f"Technician {tech_id} not found")
-	return technician
+	return TechnicianResponse.from_orm_with_counts(technician)
 
 
 @router.patch("/{tech_id}/status", response_model=TechnicianResponse)
@@ -107,7 +107,7 @@ async def update_technician_status(
 	technician = await tech_logic.update_technician_status(db, tech_id, status_data.status)
 	if not technician:
 		raise HTTPException(status_code=404, detail=f"Technician {tech_id} not found")
-	return technician
+	return TechnicianResponse.from_orm_with_counts(technician)
 
 
 @router.get("/{tech_id}/workload", response_model=TechnicianWorkload)

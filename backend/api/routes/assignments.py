@@ -9,6 +9,7 @@ from backend.database.connection import get_db
 from backend.api.schemas import (
 	AssignmentCreate, AssignmentResponse,
 	UnassignRequest, ReassignRequest, MessageResponse,
+	BatchAssignRequest, BatchUnassignRequest, BatchResult,
 )
 from backend.logic import assignments as assignment_logic
 
@@ -66,3 +67,33 @@ async def reassign_job(reassign_data: ReassignRequest, db: AsyncSession = Depend
 		return assignment
 	except ValueError as e:
 		raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/batch-assign", response_model=BatchResult)
+async def batch_assign(data: BatchAssignRequest, db: AsyncSession = Depends(get_db)):
+	"""Assign multiple jobs to a single technician in one transaction"""
+	try:
+		result = await assignment_logic.batch_assign(
+			db=db,
+			job_ids=data.job_ids,
+			technician_id=data.technician_id,
+		)
+		return BatchResult(
+			success=result["assigned"] > 0,
+			assigned=result["assigned"],
+			skipped=result["skipped"],
+			errors=result["errors"],
+		)
+	except ValueError as e:
+		raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/batch-unassign", response_model=BatchResult)
+async def batch_unassign(data: BatchUnassignRequest, db: AsyncSession = Depends(get_db)):
+	"""Unassign multiple jobs in one transaction"""
+	result = await assignment_logic.batch_unassign(db=db, job_ids=data.job_ids)
+	return BatchResult(
+		success=result["unassigned"] > 0,
+		unassigned=result["unassigned"],
+		skipped=result["skipped"],
+	)

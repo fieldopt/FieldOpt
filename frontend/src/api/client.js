@@ -19,12 +19,12 @@ export const api = {
 	getTechWorkload: (id) => apiClient.get(`/technicians/${id}/workload`),
 
 	// Jobs
-	getJobs: () => apiClient.get('/jobs/'),
+	getJobs: (params = {}) => apiClient.get('/jobs/', { params }),
 	getJob: (id) => apiClient.get(`/jobs/${id}`),
 	createJob: (data) => apiClient.post('/jobs/', data),
 	updateJobStatus: (id, status) => apiClient.patch(`/jobs/${id}/status`, { status }),
-	getJobsSummary: () => apiClient.get('/jobs/summary'),
-	getPendingJobs: () => apiClient.get('/jobs/pending'),
+	getJobsSummary: (params = {}) => apiClient.get('/jobs/summary', { params }),
+	getPendingJobs: (params = {}) => apiClient.get('/jobs/pending', { params }),
 	startJob: (id) => apiClient.post(`/jobs/${id}/start`),
 	completeJob: (id) => apiClient.post(`/jobs/${id}/complete`),
 	cancelJob: (id, reason) => apiClient.post(`/jobs/${id}/cancel`, null, { params: { reason } }),
@@ -37,6 +37,13 @@ export const api = {
 	reassignJob: (jobId, newTechId) => apiClient.post('/assignments/reassign', {
 		job_id: jobId,
 		new_technician_id: newTechId,
+	}),
+	batchAssign: (jobIds, techId) => apiClient.post('/assignments/batch-assign', {
+		job_ids: jobIds,
+		technician_id: techId,
+	}),
+	batchUnassign: (jobIds) => apiClient.post('/assignments/batch-unassign', {
+		job_ids: jobIds,
 	}),
 
 	// Routing

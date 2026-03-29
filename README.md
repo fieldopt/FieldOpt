@@ -1,4 +1,4 @@
-# FieldOpt
+
 
 ## Overview
 
@@ -7,18 +7,28 @@ An open-source field service management system built with FastAPI, PostgreSQL, V
 <table align="center">
 	<tr>
 		<td colspan="2" align="center">
-			<img src="./assets/dashboard.png" alt="Dashboard" width="400"/><br/>
-			[Dashboard]
+			<img src="./assets/dashboard.png" alt="Dashboard" width="600"/><br/>
+			Dispatch Console
 		</td>
 	</tr>
 	<tr>
 		<td align="center">
-			<img src="./assets/map.png" alt="Map View" width="200"/><br/>
-			[Map View]
+			<img src="./assets/timeline.png" alt="Timeline View" width="300"/><br/>
+			Tech Timeline
 		</td>
 		<td align="center">
-			<img src="./assets/assign.png" alt="Assign Jobs" width="200"/><br/>
-			[Assign Jobs]
+			<img src="./assets/assign.png" alt="Assign Jobs" width="300"/><br/>
+			Right-Click Dispatch
+		</td>
+	</tr>
+	<tr>
+		<td align="center">
+			<img src="./assets/map.png" alt="Map View" width="300"/><br/>
+			Floating Map
+		</td>
+		<td align="center">
+			<img src="./assets/multiselect.png" alt="Multi-Select" width="300"/><br/>
+			Multi-Select + Batch Ops
 		</td>
 	</tr>
 </table><br>
@@ -29,7 +39,7 @@ An open-source field service management system built with FastAPI, PostgreSQL, V
 
 **Capacity Management** — Prevents overbooking by tracking tech workload
 
-**Enterprise Dispatch Console** — AG Grid-powered split-pane layout with right-click context menus, drag-and-drop assignment, clickable dashboard indicators, and a floating map window
+**Enterprise Dispatch Console** — AG Grid-powered split-pane layout with right-click context menus, drag-and-drop assignment, multi-select batch operations, tech timeline, day picker, and a floating map window
 
 ## Launch FieldOpt
 
@@ -115,17 +125,17 @@ The routing engine evaluates multiple factors to find the best technician for ea
 
 #### Technicians
 - `POST /api/v1/technicians/` — Create technician
-- `GET /api/v1/technicians/` — List all technicians
+- `GET /api/v1/technicians/` — List all (includes assigned/completed job counts)
 - `GET /api/v1/technicians/available` — Get available techs
-- `PATCH /api/v1/technicians/{id}/location` — Update location
 - `PATCH /api/v1/technicians/{id}/status` — Update status
+- `PATCH /api/v1/technicians/{id}/location` — Update location
 - `GET /api/v1/technicians/{id}/workload` — Get workload
 
 #### Jobs
 - `POST /api/v1/jobs/` — Create job
-- `GET /api/v1/jobs/` — List all jobs
+- `GET /api/v1/jobs/` — List all (supports `?scheduled_date=` filter, includes assigned tech)
 - `GET /api/v1/jobs/pending` — Get unassigned jobs
-- `GET /api/v1/jobs/summary` — Job counts by status
+- `GET /api/v1/jobs/summary` — Job counts by status (supports `?target_date=`)
 - `POST /api/v1/jobs/{id}/start` — Start a job
 - `POST /api/v1/jobs/{id}/complete` — Complete a job
 - `POST /api/v1/jobs/{id}/cancel` — Cancel a job
@@ -135,6 +145,8 @@ The routing engine evaluates multiple factors to find the best technician for ea
 - `POST /api/v1/assignments/` — Assign job to tech
 - `POST /api/v1/assignments/unassign` — Unassign a job
 - `POST /api/v1/assignments/reassign` — Reassign to different tech
+- `POST /api/v1/assignments/batch-assign` — Assign multiple jobs to one tech
+- `POST /api/v1/assignments/batch-unassign` — Unassign multiple jobs
 
 #### Routing
 - `POST /api/v1/routing/auto-route` — Auto-assign all pending jobs
@@ -142,7 +154,29 @@ The routing engine evaluates multiple factors to find the best technician for ea
 
 ## Change Log
 
-### 0.0.5 (Latest)
+### 0.0.6 (Latest)
+Dispatch interactivity + batch operations
+
+- Day picker with date-filtered API calls (navigate days, all views scoped to selected date)
+- Multi-select: Cmd/Ctrl+click to toggle, Shift+click for range (respects AG Grid sort order)
+- Independent grid selections (select techs for timeline while selecting jobs for assignment)
+- Batch assign/unassign via single API call and single DB transaction
+- Batch tech status changes (select multiple techs, right-click → set all to available/break/off duty)
+- Drag-and-drop job assignment (drag from job grid, drop on tech row)
+- Multi-job drag (select multiple jobs, drag one → all selected assign to target tech)
+- Tech timeline pane (toggle-able, shows hour blocks with job assignments, stacks overlapping jobs)
+- Resizable timeline divider
+- Jobs A:C column now shows real assigned/completed counts
+- Job grid "Tech" column shows assigned technician name
+- API responses now include assignment data (assigned_tech_id/name on jobs, job counts on techs)
+- Skill-filtered context menus with multi-select awareness
+- Context menu shows batch operations when multiple items selected
+
+### Previous Versions
+<details>
+<summary>Previous Changes</summary>
+
+***0.0.5***<br>
 Complete frontend redesign — enterprise dispatch console
 
 - AG Grid-powered split-pane layout (technicians top, jobs bottom)
@@ -151,12 +185,12 @@ Complete frontend redesign — enterprise dispatch console
 - Clickable dashboard indicator bar (filters grids by status)
 - Floating, draggable, resizable map window (Leaflet)
 - Toast notifications on all dispatch actions
-- Keyboard shortcuts (R = refresh, M = map, Esc = close)
+- Keyboard shortcuts (R = refresh, M = map, T = timeline, Esc = close)
 - Dropped Tailwind — handwritten enterprise CSS with dark theme
 - Expanded API client (all endpoints wired)
 - Jazz-themed seed data
 
-### 0.0.4
+***0.0.4***<br>
 Async backend migration + bug fixes
 
 - SQLAlchemy async engine with asyncpg
@@ -164,10 +198,6 @@ Async backend migration + bug fixes
 - Fixed get_jobs_summary filter bug
 - lazy="selectin" on all relationships
 - Routing now uses current tech location over home base
-
-### Previous Versions
-<details>
-<summary>Previous Changes</summary>
 
 ***0.0.3***<br>
 Project restructuring + frontend
@@ -190,7 +220,14 @@ Initial commit
 
 ## Roadmap
 
-- [ ] Drag-and-drop job assignment (cross-grid drop detection)
+- [x] Drag-and-drop job assignment
+- [x] Day picker with date-filtered views
+- [x] Multi-select and batch operations
+- [x] Tech timeline pane
+- [ ] Display filter window (time slot, location, job type, tech)
+- [ ] Tech/staff search window
+- [ ] Job search window
+- [ ] Map as real popup window (second monitor support)
 - [ ] CanDo column (skill/route/time check indicators per WFX)
 - [ ] Dark/light theme toggle
 - [ ] Account system with role-based access
@@ -210,4 +247,3 @@ If you share the belief that simplicity empowers creativity, feel free to contri
 - Bug reports and feature requests
 
 Please ensure your code follows the existing style.
-

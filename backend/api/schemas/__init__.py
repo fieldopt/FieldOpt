@@ -27,7 +27,10 @@ from backend.api.schemas.assignments import (
 	AssignmentCreate,
 	AssignmentResponse,
 	UnassignRequest,
-	ReassignRequest
+	ReassignRequest,
+	BatchAssignRequest,
+	BatchUnassignRequest,
+	BatchResult,
 )
 
 from backend.api.schemas.routing import (
@@ -58,6 +61,9 @@ __all__ = [
 	"AssignmentResponse",
 	"UnassignRequest",
 	"ReassignRequest",
+	"BatchAssignRequest",
+	"BatchUnassignRequest",
+	"BatchResult",
 	# Routing schemas
 	"AutoRouteRequest",
 	"AutoRouteResponse",

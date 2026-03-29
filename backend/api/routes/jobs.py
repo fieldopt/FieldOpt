@@ -44,7 +44,7 @@ async def create_job(job_data: JobCreate, db: AsyncSession = Depends(get_db)):
 			notes=job_data.notes,
 			special_instructions=job_data.special_instructions,
 		)
-		return job
+		return JobResponse.from_orm_with_assignment(job)
 	except Exception as e:
 		raise HTTPException(status_code=400, detail=str(e))
 
@@ -52,12 +52,14 @@ async def create_job(job_data: JobCreate, db: AsyncSession = Depends(get_db)):
 @router.get("/", response_model=List[JobResponse])
 async def get_jobs(
 	status: Optional[JobStatus] = Query(None, description="Filter by job status"),
+	scheduled_date: Optional[date] = Query(None, description="Filter by scheduled date"),
 	skip: int = Query(0, ge=0),
 	limit: int = Query(100, ge=1, le=500),
 	db: AsyncSession = Depends(get_db),
 ):
-	"""Get all jobs with optional status filtering"""
-	return await job_logic.get_all_jobs(db, status=status, skip=skip, limit=limit)
+	"""Get all jobs with optional status and date filtering"""
+	jobs = await job_logic.get_all_jobs(db, status=status, scheduled_date=scheduled_date, skip=skip, limit=limit)
+	return [JobResponse.from_orm_with_assignment(j) for j in jobs]
 
 
 @router.get("/pending", response_model=List[JobResponse])
@@ -66,7 +68,8 @@ async def get_pending_jobs(
 	db: AsyncSession = Depends(get_db),
 ):
 	"""Get all pending (unassigned) jobs"""
-	return await job_logic.get_pending_jobs(db, scheduled_date=scheduled_date)
+	jobs = await job_logic.get_pending_jobs(db, scheduled_date=scheduled_date)
+	return [JobResponse.from_orm_with_assignment(j) for j in jobs]
 
 
 @router.get("/summary", response_model=JobSummary)
@@ -85,7 +88,7 @@ async def get_job(job_id: int, db: AsyncSession = Depends(get_db)):
 	job = await job_logic.get_job(db, job_id)
 	if not job:
 		raise HTTPException(status_code=404, detail=f"Job {job_id} not found")
-	return job
+	return JobResponse.from_orm_with_assignment(job)
 
 
 @router.patch("/{job_id}", response_model=JobResponse)
@@ -100,7 +103,8 @@ async def update_job(
 		raise HTTPException(status_code=404, detail=f"Job {job_id} not found")
 
 	update_data = job_data.model_dump(exclude_unset=True)
-	return await job_logic.update_job(db, job_id, **update_data)
+	updated = await job_logic.update_job(db, job_id, **update_data)
+	return JobResponse.from_orm_with_assignment(updated)
 
 
 @router.patch("/{job_id}/status", response_model=JobResponse)
@@ -114,7 +118,7 @@ async def update_job_status(
 		job = await job_logic.update_job_status(db, job_id, status_data.status)
 		if not job:
 			raise HTTPException(status_code=404, detail=f"Job {job_id} not found")
-		return job
+		return JobResponse.from_orm_with_assignment(job)
 	except ValueError as e:
 		raise HTTPException(status_code=400, detail=str(e))
 
@@ -126,7 +130,7 @@ async def start_job(job_id: int, db: AsyncSession = Depends(get_db)):
 		job = await job_logic.start_job(db, job_id)
 		if not job:
 			raise HTTPException(status_code=404, detail=f"Job {job_id} not found")
-		return job
+		return JobResponse.from_orm_with_assignment(job)
 	except ValueError as e:
 		raise HTTPException(status_code=400, detail=str(e))
 
@@ -138,7 +142,7 @@ async def complete_job(job_id: int, db: AsyncSession = Depends(get_db)):
 		job = await job_logic.complete_job(db, job_id)
 		if not job:
 			raise HTTPException(status_code=404, detail=f"Job {job_id} not found")
-		return job
+		return JobResponse.from_orm_with_assignment(job)
 	except ValueError as e:
 		raise HTTPException(status_code=400, detail=str(e))
 
@@ -153,7 +157,7 @@ async def cancel_job(
 	job = await job_logic.cancel_job(db, job_id, reason=reason)
 	if not job:
 		raise HTTPException(status_code=404, detail=f"Job {job_id} not found")
-	return job
+	return JobResponse.from_orm_with_assignment(job)
 
 
 @router.delete("/{job_id}", response_model=MessageResponse)
@@ -170,10 +174,7 @@ async def delete_job(job_id: int, db: AsyncSession = Depends(get_db)):
 
 @router.get("/{job_id}/can-do/{tech_id}", response_model=CanDoResult)
 async def check_can_do(job_id: int, tech_id: int, db: AsyncSession = Depends(get_db)):
-	"""
-	Check if a technician can perform a job (CanDo functionality from WFX).
-	Returns whether the tech has all required skills.
-	"""
+	"""Check if a technician can perform a job (CanDo functionality)"""
 	job = await job_logic.get_job(db, job_id)
 	if not job:
 		raise HTTPException(status_code=404, detail=f"Job {job_id} not found")

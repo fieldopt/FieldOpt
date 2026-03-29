@@ -327,6 +327,190 @@ body {
 	min-height: 0;
 }
 
+.pane-selection {
+	font-size: var(--font-size-xs);
+	color: var(--color-accent);
+	font-weight: 500;
+	margin-left: auto;
+}
+
+/* --- Day Picker --- */
+.day-picker {
+	display: flex;
+	align-items: center;
+	gap: 2px;
+}
+
+.day-picker-btn {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 22px;
+	height: 22px;
+	background: none;
+	border: 1px solid transparent;
+	border-radius: var(--border-radius);
+	color: var(--text-muted);
+	cursor: pointer;
+	font-size: 11px;
+	font-family: var(--font-family);
+}
+
+.day-picker-btn:hover {
+	background: var(--surface-row-hover);
+	color: var(--text-primary);
+	border-color: var(--border-color);
+}
+
+.day-picker-date {
+	padding: 2px 10px;
+	background: none;
+	border: 1px solid var(--border-color);
+	border-radius: var(--border-radius);
+	color: var(--text-secondary);
+	cursor: pointer;
+	font-family: var(--font-family);
+	font-size: var(--font-size-xs);
+	font-weight: 500;
+	min-width: 80px;
+	text-align: center;
+}
+
+.day-picker-date:hover {
+	background: var(--surface-row-hover);
+	color: var(--text-primary);
+}
+
+.day-picker-date--today {
+	color: var(--color-accent);
+	border-color: var(--color-accent-dim);
+}
+
+/* --- Row Selection Enhancement --- */
+.ag-theme-fieldopt .ag-row-selected {
+	border-left: 2px solid var(--color-accent) !important;
+}
+
+/* --- Tech Timeline --- */
+.timeline-container {
+	height: 100%;
+	overflow: auto;
+	background: var(--surface-panel);
+}
+
+.timeline-empty {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	height: 100%;
+	color: var(--text-muted);
+	font-size: var(--font-size-sm);
+	font-style: italic;
+}
+
+.timeline-header {
+	display: flex;
+	align-items: center;
+	height: 24px;
+	border-bottom: 1px solid var(--border-color);
+	position: sticky;
+	top: 0;
+	z-index: 2;
+	background: var(--surface-panel-alt);
+}
+
+.timeline-body {
+	position: relative;
+}
+
+.timeline-label-col {
+	width: 140px;
+	min-width: 140px;
+	padding: 0 var(--space-md);
+	font-size: var(--font-size-xs);
+	font-weight: 600;
+	color: var(--text-muted);
+	text-transform: uppercase;
+	letter-spacing: 0.03em;
+	display: flex;
+	align-items: center;
+}
+
+.timeline-tech-name {
+	color: var(--text-primary);
+	font-weight: 500;
+	text-transform: none;
+	letter-spacing: 0;
+	font-size: var(--font-size-sm);
+}
+
+.timeline-hour-header {
+	font-size: 10px;
+	color: var(--text-muted);
+	text-align: left;
+	padding-left: 4px;
+	border-left: 1px solid var(--border-light);
+}
+
+.timeline-row {
+	display: flex;
+	align-items: stretch;
+	border-bottom: 1px solid var(--border-light);
+}
+
+.timeline-track {
+	position: relative;
+	flex: 1;
+}
+
+.timeline-gridline {
+	position: absolute;
+	top: 0;
+	width: 1px;
+	background: var(--border-light);
+}
+
+.timeline-shift {
+	position: absolute;
+	background: rgba(74, 158, 255, 0.06);
+	border-radius: 2px;
+}
+
+.timeline-job {
+	position: absolute;
+	border-radius: 2px;
+	opacity: 0.85;
+	display: flex;
+	align-items: center;
+	padding: 0 4px;
+	overflow: hidden;
+	cursor: default;
+	transition: opacity 0.1s;
+}
+
+.timeline-job:hover {
+	opacity: 1;
+	z-index: 1;
+}
+
+.timeline-job-label {
+	font-size: 10px;
+	font-weight: 600;
+	color: var(--text-inverse);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.timeline-job-slot {
+	font-size: 9px;
+	font-weight: 400;
+	color: rgba(255, 255, 255, 0.7);
+	white-space: nowrap;
+	margin-left: auto;
+	padding-left: 4px;
+}
+
 /* --- Draggable Divider --- */
 .split-divider {
 	height: var(--divider-size);
@@ -733,14 +917,6 @@ body {
 	white-space: nowrap;
 	pointer-events: none;
 	font-weight: 500;
-}
-
-.ag-row[draggable="true"] {
-	cursor: grab;
-}
-
-.ag-row[draggable="true"]:active {
-	cursor: grabbing;
 }
 
 /* --- Scrollbar styling --- */

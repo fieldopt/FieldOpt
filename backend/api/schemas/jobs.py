@@ -8,7 +8,6 @@ from datetime import datetime
 from backend.database.models import JobStatus, JobType
 
 
-# Base schema with common fields
 class JobBase(BaseModel):
 	"""Base job schema"""
 	customer_name: str = Field(..., min_length=1, max_length=100)
@@ -19,7 +18,6 @@ class JobBase(BaseModel):
 	service_zip: Optional[str] = Field(None, max_length=10)
 
 
-# Schema for creating a new job
 class JobCreate(JobBase):
 	"""Schema for creating a new job"""
 	job_number: Optional[str] = Field(None, max_length=50)
@@ -37,7 +35,6 @@ class JobCreate(JobBase):
 	special_instructions: Optional[str] = None
 
 
-# Schema for updating a job
 class JobUpdate(BaseModel):
 	"""Schema for updating job information"""
 	customer_name: Optional[str] = Field(None, min_length=1, max_length=100)
@@ -59,16 +56,14 @@ class JobUpdate(BaseModel):
 	special_instructions: Optional[str] = None
 
 
-# Schema for status updates
 class JobStatusUpdate(BaseModel):
 	"""Schema for updating job status"""
 	status: JobStatus
 	reason: Optional[str] = Field(None, max_length=500)
 
 
-# Schema for API responses
 class JobResponse(JobBase):
-	"""Schema for job responses"""
+	"""Schema for job responses — includes assignment info"""
 	id: int
 	job_number: Optional[str]
 	job_type: JobType
@@ -88,11 +83,51 @@ class JobResponse(JobBase):
 	updated_at: datetime
 	started_at: Optional[datetime]
 	completed_at: Optional[datetime]
-	
+	# Assignment data — populated from the relationship
+	assigned_tech_id: Optional[int] = None
+	assigned_tech_name: Optional[str] = None
+
 	model_config = ConfigDict(from_attributes=True)
 
+	@classmethod
+	def from_orm_with_assignment(cls, job):
+		"""Build response with assignment data included"""
+		data = {
+			"id": job.id,
+			"job_number": job.job_number,
+			"job_type": job.job_type,
+			"status": job.status,
+			"customer_name": job.customer_name,
+			"customer_phone": job.customer_phone,
+			"customer_email": job.customer_email,
+			"service_address": job.service_address,
+			"service_city": job.service_city,
+			"service_zip": job.service_zip,
+			"latitude": job.latitude,
+			"longitude": job.longitude,
+			"required_skills": job.required_skills,
+			"priority": job.priority,
+			"scheduled_date": job.scheduled_date,
+			"time_slot_start": job.time_slot_start,
+			"time_slot_end": job.time_slot_end,
+			"estimated_duration": job.estimated_duration,
+			"description": job.description,
+			"notes": job.notes,
+			"special_instructions": job.special_instructions,
+			"created_at": job.created_at,
+			"updated_at": job.updated_at,
+			"started_at": job.started_at,
+			"completed_at": job.completed_at,
+			"assigned_tech_id": None,
+			"assigned_tech_name": None,
+		}
+		if job.assignment:
+			data["assigned_tech_id"] = job.assignment.technician_id
+			if job.assignment.technician:
+				data["assigned_tech_name"] = job.assignment.technician.name
+		return cls(**data)
 
-# Job summary for dashboard
+
 class JobSummary(BaseModel):
 	"""Schema for job summary statistics"""
 	total: int
@@ -104,7 +139,6 @@ class JobSummary(BaseModel):
 	on_hold: int
 
 
-# CanDo result
 class CanDoResult(BaseModel):
 	"""Schema for CanDo functionality result"""
 	job_id: int

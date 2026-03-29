@@ -78,14 +78,23 @@ async def get_job_by_number(db: AsyncSession, job_number: str) -> Optional[Job]:
 async def get_all_jobs(
 	db: AsyncSession,
 	status: Optional[JobStatus] = None,
+	scheduled_date: Optional[date] = None,
 	skip: int = 0,
 	limit: int = 100,
 ) -> List[Job]:
-	"""Get all jobs with optional status filtering"""
+	"""Get all jobs with optional status and date filtering"""
 	query = select(Job)
 
 	if status:
 		query = query.where(Job.status == status)
+
+	if scheduled_date:
+		start_of_day = datetime.combine(scheduled_date, datetime.min.time())
+		end_of_day = datetime.combine(scheduled_date, datetime.max.time())
+		query = query.where(
+			Job.scheduled_date >= start_of_day,
+			Job.scheduled_date <= end_of_day,
+		)
 
 	query = query.order_by(Job.created_at.desc()).offset(skip).limit(limit)
 	result = await db.execute(query)
