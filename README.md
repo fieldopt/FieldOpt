@@ -21,7 +21,7 @@ An open-source field service management system built with FastAPI, PostgreSQL, V
 	</tr>
 	<tr>
 	<td align="center">
-			<img src="./assets/map.png" alt="Route Filter Display" width="300"/><br/>
+			<img src="./assets/filter.png" alt="Route Filter Display" width="300"/><br/>
 			Route Filter Display
 		</td>
 		<td align="center">
