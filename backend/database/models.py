@@ -79,6 +79,9 @@ class Technician(Base):
 	# Skills (stored as JSON array of skill strings)
 	skills: Mapped[list] = mapped_column(JSON, default=list, nullable=False)
 
+	# Assigned Routes — management areas this tech works (e.g. ["MN-HARLEM", "MN-WASH-HTS"])
+	assigned_routes: Mapped[list] = mapped_column(JSON, default=list, nullable=False)
+
 	# Schedule
 	shift_start: Mapped[Optional[str]] = mapped_column(String(5))  # HH:MM format
 	shift_end: Mapped[Optional[str]] = mapped_column(String(5))
@@ -143,6 +146,9 @@ class Job(Base):
 
 	# Required Skills (stored as JSON array)
 	required_skills: Mapped[list] = mapped_column(JSON, default=list, nullable=False)
+
+	# Route Criteria — management area / geographic zone (e.g. "MN-HARLEM", "BK-EAST")
+	route_criteria: Mapped[Optional[str]] = mapped_column(String(50), index=True)
 
 	# Priority and Scheduling
 	priority: Mapped[int] = mapped_column(Integer, default=3)  # 1=highest, 5=lowest

@@ -2,8 +2,23 @@
 Seed database with jazz-themed sample data for development and testing.
 Techs are jazz musicians, jobs are concert venue gigs.
 
+Management Areas:
+  MN-DOWNTOWN  — Lower Manhattan (below 14th St)
+  MN-MIDTOWN   — Midtown Manhattan (14th–59th St)
+  MN-WEST      — Upper West Side (59th–110th St west)
+  MN-EAST      — Upper East Side (59th–110th St east)
+  MN-HARLEM    — Harlem / Washington Heights (110th+ St)
+  MN-WASH-HTS  — Washington Heights (155th+ St)
+  BK-NORTH     — North Brooklyn (Williamsburg, Greenpoint, DUMBO)
+  BK-WEST      — West Brooklyn (Cobble Hill, Park Slope, Red Hook)
+  BK-SOUTH     — South Brooklyn (Flatbush, Midwood)
+  BK-EAST      — East Brooklyn (Bed-Stuy, Bushwick, East NY)
+  QN-SOUTH     — South Queens (Jamaica, Far Rockaway)
+  QN-CENTRAL   — Central Queens (Flushing, Forest Hills)
+  BX-SOUTH     — South Bronx
+
 Usage:
-    python -m backend.database.seeds.seed_data
+	python -m backend.database.seeds.seed_data
 """
 import asyncio
 from datetime import datetime, timedelta
@@ -24,6 +39,7 @@ TECHNICIANS = [
 		"home_longitude": -73.9712,
 		"home_address": "Upper West Side, Manhattan",
 		"skills": ["install", "repair", "maintenance"],
+		"assigned_routes": ["MN-WEST", "MN-MIDTOWN"],
 		"shift_start": "08:00",
 		"shift_end": "17:00",
 		"max_jobs_per_day": 8,
@@ -38,6 +54,7 @@ TECHNICIANS = [
 		"home_longitude": -73.7949,
 		"home_address": "Jamaica, Queens",
 		"skills": ["install", "repair", "disconnect"],
+		"assigned_routes": ["QN-SOUTH", "QN-CENTRAL"],
 		"shift_start": "07:00",
 		"shift_end": "16:00",
 		"max_jobs_per_day": 7,
@@ -52,6 +69,7 @@ TECHNICIANS = [
 		"home_longitude": -73.9857,
 		"home_address": "Cobble Hill, Brooklyn",
 		"skills": ["install", "repair", "maintenance", "inspection", "service_change"],
+		"assigned_routes": ["BK-NORTH", "BK-WEST"],
 		"shift_start": "08:00",
 		"shift_end": "18:00",
 		"max_jobs_per_day": 10,
@@ -66,6 +84,7 @@ TECHNICIANS = [
 		"home_longitude": -73.9465,
 		"home_address": "Harlem, Manhattan",
 		"skills": ["repair", "maintenance", "inspection"],
+		"assigned_routes": ["MN-HARLEM", "MN-WASH-HTS"],
 		"shift_start": "09:00",
 		"shift_end": "17:00",
 		"max_jobs_per_day": 6,
@@ -80,6 +99,7 @@ TECHNICIANS = [
 		"home_longitude": -73.9496,
 		"home_address": "Flatbush, Brooklyn",
 		"skills": ["install", "disconnect", "service_change"],
+		"assigned_routes": ["BK-SOUTH", "BK-EAST"],
 		"shift_start": "07:00",
 		"shift_end": "15:00",
 		"max_jobs_per_day": 8,
@@ -94,6 +114,7 @@ TECHNICIANS = [
 		"home_longitude": -73.9772,
 		"home_address": "Midtown East, Manhattan",
 		"skills": ["install", "repair", "maintenance", "disconnect"],
+		"assigned_routes": ["MN-MIDTOWN", "MN-EAST"],
 		"shift_start": "08:00",
 		"shift_end": "17:00",
 		"max_jobs_per_day": 9,
@@ -108,6 +129,7 @@ TECHNICIANS = [
 		"home_longitude": -73.9262,
 		"home_address": "South Bronx, Bronx",
 		"skills": ["install", "repair", "inspection"],
+		"assigned_routes": ["BX-SOUTH", "MN-HARLEM"],
 		"shift_start": "08:00",
 		"shift_end": "16:00",
 		"max_jobs_per_day": 7,
@@ -122,6 +144,7 @@ TECHNICIANS = [
 		"home_longitude": -73.9868,
 		"home_address": "Lower East Side, Manhattan",
 		"skills": ["repair", "maintenance", "service_change", "inspection"],
+		"assigned_routes": ["MN-DOWNTOWN", "MN-EAST"],
 		"shift_start": "10:00",
 		"shift_end": "19:00",
 		"max_jobs_per_day": 6,
@@ -136,6 +159,7 @@ TECHNICIANS = [
 		"home_longitude": -73.9776,
 		"home_address": "5th Ave, Manhattan",
 		"skills": ["install", "repair", "disconnect"],
+		"assigned_routes": ["MN-MIDTOWN", "MN-WEST"],
 		"shift_start": "08:00",
 		"shift_end": "17:00",
 		"max_jobs_per_day": 8,
@@ -150,6 +174,7 @@ TECHNICIANS = [
 		"home_longitude": -73.9418,
 		"home_address": "Bedford-Stuyvesant, Brooklyn",
 		"skills": ["install", "maintenance", "repair", "disconnect", "service_change"],
+		"assigned_routes": ["BK-NORTH", "BK-EAST"],
 		"shift_start": "06:00",
 		"shift_end": "15:00",
 		"max_jobs_per_day": 10,
@@ -175,6 +200,7 @@ def make_jobs():
 			"longitude": -73.9973,
 			"job_type": JobType.INSTALL,
 			"required_skills": ["install"],
+			"route_criteria": "MN-DOWNTOWN",
 			"priority": 1,
 			"scheduled_date": today,
 			"time_slot_start": "08:00",
@@ -191,6 +217,7 @@ def make_jobs():
 			"longitude": -74.0014,
 			"job_type": JobType.REPAIR,
 			"required_skills": ["repair"],
+			"route_criteria": "MN-DOWNTOWN",
 			"priority": 2,
 			"scheduled_date": today,
 			"time_slot_start": "08:00",
@@ -207,6 +234,7 @@ def make_jobs():
 			"longitude": -73.9905,
 			"job_type": JobType.MAINTENANCE,
 			"required_skills": ["maintenance"],
+			"route_criteria": "MN-MIDTOWN",
 			"priority": 3,
 			"scheduled_date": today,
 			"time_slot_start": "12:00",
@@ -223,6 +251,7 @@ def make_jobs():
 			"longitude": -73.9830,
 			"job_type": JobType.INSTALL,
 			"required_skills": ["install", "service_change"],
+			"route_criteria": "MN-WEST",
 			"priority": 1,
 			"scheduled_date": today,
 			"time_slot_start": "08:00",
@@ -240,6 +269,7 @@ def make_jobs():
 			"longitude": -74.0023,
 			"job_type": JobType.REPAIR,
 			"required_skills": ["repair", "maintenance"],
+			"route_criteria": "MN-DOWNTOWN",
 			"priority": 2,
 			"scheduled_date": today,
 			"time_slot_start": "12:00",
@@ -256,6 +286,7 @@ def make_jobs():
 			"longitude": -73.9828,
 			"job_type": JobType.INSPECTION,
 			"required_skills": ["inspection"],
+			"route_criteria": "MN-WEST",
 			"priority": 3,
 			"scheduled_date": today,
 			"time_slot_start": "08:00",
@@ -272,6 +303,7 @@ def make_jobs():
 			"longitude": -73.9960,
 			"job_type": JobType.DISCONNECT,
 			"required_skills": ["disconnect"],
+			"route_criteria": "MN-DOWNTOWN",
 			"priority": 4,
 			"scheduled_date": today,
 			"time_slot_start": "12:00",
@@ -288,6 +320,7 @@ def make_jobs():
 			"longitude": -73.9541,
 			"job_type": JobType.INSTALL,
 			"required_skills": ["install", "repair"],
+			"route_criteria": "MN-HARLEM",
 			"priority": 2,
 			"scheduled_date": today,
 			"time_slot_start": "08:00",
@@ -304,6 +337,7 @@ def make_jobs():
 			"longitude": -73.9500,
 			"job_type": JobType.SERVICE_CHANGE,
 			"required_skills": ["service_change", "install"],
+			"route_criteria": "MN-HARLEM",
 			"priority": 1,
 			"scheduled_date": today,
 			"time_slot_start": "08:00",
@@ -321,6 +355,7 @@ def make_jobs():
 			"longitude": -73.9990,
 			"job_type": JobType.REPAIR,
 			"required_skills": ["repair"],
+			"route_criteria": "MN-DOWNTOWN",
 			"priority": 3,
 			"scheduled_date": today,
 			"time_slot_start": "12:00",
@@ -338,6 +373,7 @@ def make_jobs():
 			"longitude": -73.9618,
 			"job_type": JobType.INSTALL,
 			"required_skills": ["install", "maintenance"],
+			"route_criteria": "BK-NORTH",
 			"priority": 2,
 			"scheduled_date": tomorrow,
 			"time_slot_start": "08:00",
@@ -354,6 +390,7 @@ def make_jobs():
 			"longitude": -73.9621,
 			"job_type": JobType.MAINTENANCE,
 			"required_skills": ["maintenance", "inspection"],
+			"route_criteria": "BK-NORTH",
 			"priority": 3,
 			"scheduled_date": tomorrow,
 			"time_slot_start": "08:00",
@@ -370,6 +407,7 @@ def make_jobs():
 			"longitude": -74.0002,
 			"job_type": JobType.REPAIR,
 			"required_skills": ["repair", "service_change"],
+			"route_criteria": "MN-DOWNTOWN",
 			"priority": 2,
 			"scheduled_date": tomorrow,
 			"time_slot_start": "12:00",
@@ -386,6 +424,7 @@ def make_jobs():
 			"longitude": -74.0057,
 			"job_type": JobType.INSTALL,
 			"required_skills": ["install"],
+			"route_criteria": "MN-DOWNTOWN",
 			"priority": 4,
 			"scheduled_date": tomorrow,
 			"time_slot_start": "08:00",
@@ -402,6 +441,7 @@ def make_jobs():
 			"longitude": -74.0020,
 			"job_type": JobType.INSPECTION,
 			"required_skills": ["inspection"],
+			"route_criteria": "MN-DOWNTOWN",
 			"priority": 5,
 			"scheduled_date": tomorrow,
 			"time_slot_start": "12:00",

@@ -25,6 +25,7 @@ class JobCreate(JobBase):
 	latitude: float = Field(..., ge=-90, le=90)
 	longitude: float = Field(..., ge=-180, le=180)
 	required_skills: List[str] = Field(default_factory=list)
+	route_criteria: Optional[str] = Field(None, max_length=50)
 	priority: int = Field(default=3, ge=1, le=5)
 	scheduled_date: Optional[datetime] = None
 	time_slot_start: Optional[str] = Field(None, pattern=r"^\d{2}:\d{2}$")
@@ -46,6 +47,7 @@ class JobUpdate(BaseModel):
 	latitude: Optional[float] = Field(None, ge=-90, le=90)
 	longitude: Optional[float] = Field(None, ge=-180, le=180)
 	required_skills: Optional[List[str]] = None
+	route_criteria: Optional[str] = Field(None, max_length=50)
 	priority: Optional[int] = Field(None, ge=1, le=5)
 	scheduled_date: Optional[datetime] = None
 	time_slot_start: Optional[str] = Field(None, pattern=r"^\d{2}:\d{2}$")
@@ -71,6 +73,7 @@ class JobResponse(JobBase):
 	latitude: float
 	longitude: float
 	required_skills: List[str]
+	route_criteria: Optional[str] = None
 	priority: int
 	scheduled_date: Optional[datetime]
 	time_slot_start: Optional[str]
@@ -106,6 +109,7 @@ class JobResponse(JobBase):
 			"latitude": job.latitude,
 			"longitude": job.longitude,
 			"required_skills": job.required_skills,
+			"route_criteria": job.route_criteria,
 			"priority": job.priority,
 			"scheduled_date": job.scheduled_date,
 			"time_slot_start": job.time_slot_start,
@@ -140,8 +144,13 @@ class JobSummary(BaseModel):
 
 
 class CanDoResult(BaseModel):
-	"""Schema for CanDo functionality result"""
+	"""Schema for CanDo functionality result — skill, route, time checks"""
 	job_id: int
 	technician_id: int
 	can_do: bool
+	has_skill: bool
+	has_route: bool
+	has_time: bool
 	missing_skills: List[str]
+	route_match: bool
+	distance_miles: Optional[float] = None

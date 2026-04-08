@@ -13,7 +13,7 @@ from backend.api.schemas import (
 )
 from backend.logic import jobs as job_logic
 from backend.logic import technicians as tech_logic
-from backend.database.models import JobStatus
+from backend.database.models import JobStatus, JobType
 
 router = APIRouter()
 
@@ -35,6 +35,7 @@ async def create_job(job_data: JobCreate, db: AsyncSession = Depends(get_db)):
 			customer_email=job_data.customer_email,
 			service_city=job_data.service_city,
 			service_zip=job_data.service_zip,
+			route_criteria=job_data.route_criteria,
 			priority=job_data.priority,
 			scheduled_date=job_data.scheduled_date,
 			time_slot_start=job_data.time_slot_start,
@@ -80,6 +81,42 @@ async def get_jobs_summary(
 	"""Get summary statistics of jobs by status"""
 	summary = await job_logic.get_jobs_summary(db, target_date=target_date)
 	return JobSummary(**summary)
+
+
+@router.get("/search/query", response_model=List[JobResponse])
+async def search_jobs(
+	date_from: Optional[date] = Query(None, description="Search from date"),
+	date_to: Optional[date] = Query(None, description="Search to date"),
+	job_id: Optional[int] = Query(None, description="Filter by job ID"),
+	job_number: Optional[str] = Query(None, description="Filter by job number (partial match)"),
+	tech_id: Optional[int] = Query(None, description="Filter by assigned technician ID"),
+	customer_name: Optional[str] = Query(None, description="Filter by customer name (partial match)"),
+	status: Optional[JobStatus] = Query(None, description="Filter by job status"),
+	job_type: Optional[JobType] = Query(None, description="Filter by job type"),
+	route_criteria: Optional[str] = Query(None, description="Filter by route criteria / management area"),
+	skill_group: Optional[str] = Query(None, description="Filter by required skill"),
+	limit: int = Query(200, ge=1, le=1000),
+	db: AsyncSession = Depends(get_db),
+):
+	"""
+	Multi-criteria job search — historical, current, and future jobs.
+	At least one search criteria should be provided.
+	"""
+	jobs = await job_logic.search_jobs(
+		db,
+		date_from=date_from,
+		date_to=date_to,
+		job_id=job_id,
+		job_number=job_number,
+		tech_id=tech_id,
+		customer_name=customer_name,
+		status=status,
+		job_type=job_type,
+		route_criteria=route_criteria,
+		skill_group=skill_group,
+		limit=limit,
+	)
+	return [JobResponse.from_orm_with_assignment(j) for j in jobs]
 
 
 @router.get("/{job_id}", response_model=JobResponse)
@@ -174,7 +211,7 @@ async def delete_job(job_id: int, db: AsyncSession = Depends(get_db)):
 
 @router.get("/{job_id}/can-do/{tech_id}", response_model=CanDoResult)
 async def check_can_do(job_id: int, tech_id: int, db: AsyncSession = Depends(get_db)):
-	"""Check if a technician can perform a job (CanDo functionality)"""
+	"""Check if a technician can perform a job (CanDo — skill, route, time)"""
 	job = await job_logic.get_job(db, job_id)
 	if not job:
 		raise HTTPException(status_code=404, detail=f"Job {job_id} not found")
@@ -183,11 +220,11 @@ async def check_can_do(job_id: int, tech_id: int, db: AsyncSession = Depends(get
 	if not tech:
 		raise HTTPException(status_code=404, detail=f"Technician {tech_id} not found")
 
-	can_do, missing_skills = job_logic.can_technician_do_job(job, tech)
+	result = job_logic.can_technician_do_job(job, tech)
 
 	return CanDoResult(
 		job_id=job_id,
 		technician_id=tech_id,
-		can_do=can_do,
-		missing_skills=missing_skills,
+		**result,
 	)
+

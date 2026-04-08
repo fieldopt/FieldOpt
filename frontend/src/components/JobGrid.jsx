@@ -58,7 +58,7 @@ function DateCellRenderer({ value }) {
 	);
 }
 
-export default function JobGrid({ jobs, selectedIds = [], onRowClicked, onContextMenu, onDragStart }) {
+export default function JobGrid({ jobs, selectedIds = [], onRowClicked, onContextMenu, onDragStart, onRowDoubleClicked }) {
 	const gridRef = useRef(null);
 
 	const columnDefs = useMemo(() => [
@@ -79,6 +79,11 @@ export default function JobGrid({ jobs, selectedIds = [], onRowClicked, onContex
 		},
 		{ field: 'priority', headerName: 'Pri', width: 50, cellRenderer: PriorityCellRenderer },
 		{ field: 'customer_name', headerName: 'Customer', minWidth: 140, flex: 1 },
+		{
+			field: 'route_criteria', headerName: 'RteC', width: 90,
+			cellStyle: { fontFamily: 'var(--font-mono)', fontSize: 'var(--font-size-xs)', color: 'var(--text-secondary)' },
+			valueFormatter: (p) => p.value || '—',
+		},
 		{
 			field: 'service_address', headerName: 'Address', minWidth: 180, flex: 1.5,
 			cellStyle: { fontSize: 'var(--font-size-xs)', color: 'var(--text-secondary)' },
@@ -177,6 +182,10 @@ export default function JobGrid({ jobs, selectedIds = [], onRowClicked, onContex
 		document.addEventListener('mouseup', onUp);
 	}, [onDragStart]);
 
+	const handleDoubleClick = useCallback((p) => {
+		if (p.data && onRowDoubleClicked) onRowDoubleClicked(p.data);
+	}, [onRowDoubleClicked]);
+
 	return (
 		<div
 			className="ag-theme-fieldopt"
@@ -197,6 +206,7 @@ export default function JobGrid({ jobs, selectedIds = [], onRowClicked, onContex
 				suppressCellFocus={true}
 				onCellContextMenu={onCellContextMenu}
 				onRowClicked={handleRowClicked}
+				onRowDoubleClicked={handleDoubleClick}
 				preventDefaultOnContextMenu={true}
 			/>
 		</div>

@@ -59,6 +59,11 @@ export default function TechGrid({ technicians, selectedIds = [], onRowClicked, 
 			valueGetter: (p) => (p.data?.assigned_jobs ?? 0) + (p.data?.completed_jobs ?? 0),
 		},
 		{
+			field: 'assigned_routes', headerName: 'Routes', width: 120,
+			cellStyle: { fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--text-muted)' },
+			valueFormatter: (p) => p.value?.join(', ') ?? '—',
+		},
+		{
 			field: 'max_jobs_per_day', headerName: 'Max', width: 55,
 			cellStyle: { fontFamily: 'var(--font-mono)', fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)' },
 		},

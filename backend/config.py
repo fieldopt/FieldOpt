@@ -14,7 +14,7 @@ class Settings(BaseSettings):
 
 	# Application
 	APP_NAME: str = "FieldOpt"
-	APP_VERSION: str = "0.0.5"
+	APP_VERSION: str = "0.0.7"
 	DEBUG: bool = True
 	ENVIRONMENT: str = "development"
 

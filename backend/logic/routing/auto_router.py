@@ -56,8 +56,8 @@ async def auto_route_jobs(
 		eligible_techs = []
 
 		for tech in available_techs:
-			can_do, missing = job_logic.can_technician_do_job(job, tech)
-			if not can_do:
+			result = job_logic.can_technician_do_job(job, tech)
+			if not result["can_do"]:
 				continue
 
 			# FIX: Use current location when available, fall back to home base
@@ -112,8 +112,8 @@ async def find_best_technician_for_job(
 	eligible_techs = []
 
 	for tech in available_techs:
-		can_do, missing = job_logic.can_technician_do_job(job, tech)
-		if not can_do:
+		result = job_logic.can_technician_do_job(job, tech)
+		if not result["can_do"]:
 			continue
 
 		origin_lat = tech.current_latitude if tech.current_latitude is not None else tech.home_latitude

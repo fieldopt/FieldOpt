@@ -22,6 +22,7 @@ class TechnicianCreate(TechnicianBase):
 	home_longitude: float = Field(..., ge=-180, le=180)
 	home_address: Optional[str] = None
 	skills: List[str] = Field(default_factory=list)
+	assigned_routes: List[str] = Field(default_factory=list)
 	shift_start: Optional[str] = Field(None, pattern=r"^\d{2}:\d{2}$")
 	shift_end: Optional[str] = Field(None, pattern=r"^\d{2}:\d{2}$")
 	max_jobs_per_day: int = Field(default=8, ge=1, le=20)
@@ -36,6 +37,7 @@ class TechnicianUpdate(BaseModel):
 	home_longitude: Optional[float] = Field(None, ge=-180, le=180)
 	home_address: Optional[str] = None
 	skills: Optional[List[str]] = None
+	assigned_routes: Optional[List[str]] = None
 	shift_start: Optional[str] = Field(None, pattern=r"^\d{2}:\d{2}$")
 	shift_end: Optional[str] = Field(None, pattern=r"^\d{2}:\d{2}$")
 	max_jobs_per_day: Optional[int] = Field(None, ge=1, le=20)
@@ -65,6 +67,7 @@ class TechnicianResponse(TechnicianBase):
 	home_longitude: float
 	home_address: Optional[str]
 	skills: List[str]
+	assigned_routes: List[str]
 	shift_start: Optional[str]
 	shift_end: Optional[str]
 	max_jobs_per_day: int
@@ -106,6 +109,7 @@ class TechnicianResponse(TechnicianBase):
 			home_longitude=tech.home_longitude,
 			home_address=tech.home_address,
 			skills=tech.skills,
+			assigned_routes=tech.assigned_routes if tech.assigned_routes else [],
 			shift_start=tech.shift_start,
 			shift_end=tech.shift_end,
 			max_jobs_per_day=tech.max_jobs_per_day,

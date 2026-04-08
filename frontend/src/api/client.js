@@ -50,6 +50,17 @@ export const api = {
 	autoRoute: (data = {}) => apiClient.post('/routing/auto-route', data),
 	getBestTech: (jobId) => apiClient.get(`/routing/best-tech/${jobId}`),
 	canDo: (jobId, techId) => apiClient.get(`/jobs/${jobId}/can-do/${techId}`),
+
+	// Job Search — multi-criteria query
+	searchJobs: (params = {}) => apiClient.get('/jobs/search/query', { params }),
+
+	// Batch CanDo — evaluate all techs for a single job (client-side orchestration)
+	canDoAll: async (jobId, techIds) => {
+		const results = await Promise.all(
+			techIds.map((tid) => apiClient.get(`/jobs/${jobId}/can-do/${tid}`).catch(() => null))
+		);
+		return results.filter(Boolean).map((r) => r.data);
+	},
 };
 
 export default api;
