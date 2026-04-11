@@ -1,6 +1,7 @@
 import axios from 'axios';
 
-const API_BASE_URL = 'http://localhost:8000/api/v1';
+// Use relative path so it works on any domain/IP
+const API_BASE_URL = '/api/v1';
 
 const apiClient = axios.create({
 	baseURL: API_BASE_URL,
@@ -22,12 +23,13 @@ export const api = {
 	getJobs: (params = {}) => apiClient.get('/jobs/', { params }),
 	getJob: (id) => apiClient.get(`/jobs/${id}`),
 	createJob: (data) => apiClient.post('/jobs/', data),
-	updateJobStatus: (id, status) => apiClient.patch(`/jobs/${id}/status`, { status }),
+	updateJob: (id, data) => apiClient.patch(`/jobs/${id}`, data),
 	getJobsSummary: (params = {}) => apiClient.get('/jobs/summary', { params }),
-	getPendingJobs: (params = {}) => apiClient.get('/jobs/pending', { params }),
-	startJob: (id) => apiClient.post(`/jobs/${id}/start`),
-	completeJob: (id) => apiClient.post(`/jobs/${id}/complete`),
-	cancelJob: (id, reason) => apiClient.post(`/jobs/${id}/cancel`, null, { params: { reason } }),
+	getPendingJobs: () => apiClient.get('/jobs/pending'),
+	startJob: (jobId) => apiClient.post(`/jobs/${jobId}/start`, {}),
+	completeJob: (jobId) => apiClient.post(`/jobs/${jobId}/complete`, {}),
+	cancelJob: (jobId) => apiClient.post(`/jobs/${jobId}/cancel`, {}),
+	canDo: (jobId, techId) => apiClient.get(`/jobs/${jobId}/can-do/${techId}`),
 
 	// Assignments
 	createAssignment: (data) => apiClient.post('/assignments/', data),
@@ -54,7 +56,7 @@ export const api = {
 	// Job Search — multi-criteria query
 	searchJobs: (params = {}) => apiClient.get('/jobs/search/query', { params }),
 
-	// Batch CanDo — evaluate all techs for a single job (client-side orchestration)
+	// Batch CanDo — evaluate all techs for a single job
 	canDoAll: async (jobId, techIds) => {
 		const results = await Promise.all(
 			techIds.map((tid) => apiClient.get(`/jobs/${jobId}/can-do/${tid}`).catch(() => null))

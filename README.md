@@ -268,7 +268,7 @@ Initial commit
 - [ ] WebSocket real-time updates
 - [ ] Mobile technician PWA
 - [ ] Docker compose full stack
-- [ ] Hosted live demo
+- [x] Hosted live demo
 
 ## Contributing
 

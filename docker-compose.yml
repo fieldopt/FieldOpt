@@ -15,6 +15,56 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    networks:
+      - fieldopt-network
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: fieldopt-backend
+    environment:
+      DATABASE_URL: postgresql+asyncpg://fieldopt:fieldopt@postgres:5432/fieldopt
+      API_HOST: 0.0.0.0
+      API_PORT: 8000
+      API_RELOAD: "false"
+      CORS_ORIGINS: '["http://localhost","http://127.0.0.1"]'
+      LOG_LEVEL: INFO
+      DEBUG: "false"
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - fieldopt-network
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8000/health').raise_for_status()"]
+      interval: 30s
+      timeout: 10s
+      start_period: 40s
+      retries: 3
+
+  nginx:
+    image: nginx:alpine
+    container_name: fieldopt-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deploy/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./frontend/dist:/usr/share/nginx/html:ro
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+    depends_on:
+      - backend
+    networks:
+      - fieldopt-network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/"]
+      interval: 30s
+      timeout: 10s
+      start_period: 5s
+      retries: 3
 
   pgadmin:
     image: dpage/pgadmin4:latest
@@ -26,6 +76,12 @@ services:
       - "5050:80"
     depends_on:
       - postgres
+    networks:
+      - fieldopt-network
 
 volumes:
   postgres_data:
+
+networks:
+  fieldopt-network:
+    driver: bridge

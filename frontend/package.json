@@ -13,6 +13,7 @@
 		"ag-grid-community": "^33.2.5",
 		"ag-grid-react": "^33.2.5",
 		"axios": "^1.13.2",
+		"ci": "^2.3.0",
 		"leaflet": "^1.9.4",
 		"react": "^19.2.0",
 		"react-dom": "^19.2.0",
