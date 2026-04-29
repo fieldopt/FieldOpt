@@ -5,10 +5,11 @@ Manage job assignments to technicians
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from typing import List, Optional
-from datetime import datetime
+from datetime import datetime, timedelta
 
-from backend.database.models import Assignment, Job, Technician, JobStatus
+from backend.database.models import Assignment, Job, Technician, JobStatus, TechnicianStatus
 from backend.logic.routing.distance import haversine_distance, calculate_travel_time
+from backend.simulation.sampler import sample_duration
 
 
 async def create_assignment(
@@ -16,6 +17,8 @@ async def create_assignment(
 	job_id: int,
 	technician_id: int,
 	sequence: Optional[int] = None,
+	*,
+	now: Optional[datetime] = None,
 ) -> Assignment:
 	"""Create a new assignment linking a job to a technician"""
 	existing_result = await db.execute(
@@ -48,9 +51,17 @@ async def create_assignment(
 		sequence=sequence,
 		estimated_distance=distance,
 		estimated_travel_time=travel_time,
+		actual_duration_minutes=sample_duration(job, tech),
+		# Stamp ETA at assign time so the timeline shows the right slot
+		# immediately, not after the loop's step-1 pass on the next tick.
+		estimated_arrival=(now + timedelta(minutes=travel_time)) if now else None,
 	)
 
 	job.status = JobStatus.ASSIGNED
+	# Mark tech busy so the strategy stops picking them on subsequent jobs.
+	# Step 2 of the sim tick flips them to ON_JOB on arrival; step 3 back to AVAILABLE on complete.
+	if tech.status == TechnicianStatus.AVAILABLE:
+		tech.status = TechnicianStatus.EN_ROUTE
 
 	db.add(assignment)
 	await db.commit()

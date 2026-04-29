@@ -10,3 +10,6 @@ python-multipart==0.0.6
 python-jose[cryptography]==3.3.0
 passlib[bcrypt]==1.7.4
 python-dotenv==1.0.0
+alembic==1.15.2
+numpy>=1.26.0
+scipy>=1.11.0

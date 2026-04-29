@@ -56,6 +56,14 @@ export const api = {
 	// Job Search — multi-criteria query
 	searchJobs: (params = {}) => apiClient.get('/jobs/search/query', { params }),
 
+	// Simulation control (IS_DEMO-gated — 404 in production)
+	simStatus: () => apiClient.get('/simulation/status'),
+	simStart: (speed = 200) => apiClient.post('/simulation/start', { speed }),
+	simPause: () => apiClient.post('/simulation/pause'),
+	simResume: () => apiClient.post('/simulation/resume'),
+	simStop: () => apiClient.post('/simulation/stop'),
+	simSetSpeed: (speed) => apiClient.post('/simulation/speed', { speed }),
+
 	// Batch CanDo — evaluate all techs for a single job
 	canDoAll: async (jobId, techIds) => {
 		const results = await Promise.all(

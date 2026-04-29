@@ -89,6 +89,10 @@ class JobResponse(JobBase):
 	# Assignment data — populated from the relationship
 	assigned_tech_id: Optional[int] = None
 	assigned_tech_name: Optional[str] = None
+	# Live schedule — used by the tech timeline so blocks reflect actual ETA
+	# and sampled duration, not the customer-facing time-slot window.
+	estimated_arrival: Optional[datetime] = None
+	actual_duration_minutes: Optional[int] = None
 
 	model_config = ConfigDict(from_attributes=True)
 
@@ -124,9 +128,13 @@ class JobResponse(JobBase):
 			"completed_at": job.completed_at,
 			"assigned_tech_id": None,
 			"assigned_tech_name": None,
+			"estimated_arrival": None,
+			"actual_duration_minutes": None,
 		}
 		if job.assignment:
 			data["assigned_tech_id"] = job.assignment.technician_id
+			data["estimated_arrival"] = job.assignment.estimated_arrival
+			data["actual_duration_minutes"] = job.assignment.actual_duration_minutes
 			if job.assignment.technician:
 				data["assigned_tech_name"] = job.assignment.technician.name
 		return cls(**data)

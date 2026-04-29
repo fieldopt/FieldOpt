@@ -12,6 +12,15 @@ function parseTime(timeStr) {
 	return h + m / 60;
 }
 
+function etaToHour(iso) {
+	if (!iso) return null;
+	const d = new Date(iso);
+	if (isNaN(d.getTime())) return null;
+	// Demo virtual day is UTC-based (08:00 start). Use UTC getters so the timeline
+	// matches the seeded virtual clock regardless of viewer timezone.
+	return d.getUTCHours() + d.getUTCMinutes() / 60 + d.getUTCSeconds() / 3600;
+}
+
 function fmtSlot(start, end) {
 	if (!start || !end) return '';
 	return `${start}–${end}`;
@@ -51,12 +60,17 @@ export default function TechTimeline({ technicians, jobs }) {
 			const techJobs = jobs
 				.filter((j) => j.assigned_tech_id === tech.id)
 				.map((job) => {
-					const start = parseTime(job.time_slot_start);
-					const duration = job.estimated_duration / 60;
+					// Prefer actual ETA + sampled duration so the block reflects when
+					// the tech is really there. Fall back to the customer time slot
+					// for jobs that haven't been picked up by the dispatcher yet.
+					const etaHour = etaToHour(job.estimated_arrival);
+					const startHour = etaHour ?? parseTime(job.time_slot_start) ?? 8;
+					const minutes = job.actual_duration_minutes ?? job.estimated_duration ?? 60;
+					const durationHours = Math.max(minutes / 60, 0.25); // floor 15min so block is visible
 					return {
 						...job,
-						startHour: start ?? 8,
-						durationHours: duration,
+						startHour,
+						durationHours,
 					};
 				});
 

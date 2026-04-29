@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { api } from '../api/client';
 import TechGrid from './TechGrid';
 import JobGrid from './JobGrid';
@@ -10,10 +10,16 @@ import FilterWindow from './FilterWindow';
 import PersonnelWindow from './PersonnelWindow';
 import JobSearchWindow from './JobSearchWindow';
 import JobDetailPanel from './JobDetailPanel';
+import CalendarPicker from './CalendarPicker';
+import SimBar from './SimBar';
+import { useSimEvents } from '../hooks/useSimEvents';
 
 /* ── Helpers ─────────────────────────────────────────────── */
 function fmtDate(d) {
 	return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+function fmtUTCDate(d) {
+	return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`;
 }
 function fmtDateDisplay(d) {
 	const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -31,6 +37,8 @@ export default function Dashboard() {
 
 	/* ── Day ──────────────────────────────────────────────── */
 	const [viewDate, setViewDate] = useState(() => new Date());
+	const [calOpen, setCalOpen] = useState(false);
+	const calAnchorRef = useRef(null);
 	const isToday = sameDay(viewDate, new Date());
 
 	/* ── UI ───────────────────────────────────────────────── */
@@ -44,17 +52,17 @@ export default function Dashboard() {
 	const [timelineHeight, setTimelineHeight] = useState(180);
 	const [tlDrag, setTlDrag] = useState(false);
 
-	/* ── v0.0.7 Windows ───────────────────────────────────── */
+	/* ── v0.0.8 Windows ───────────────────────────────────── */
 	const [filterOpen, setFilterOpen] = useState(false);
 	const [personnelOpen, setPersonnelOpen] = useState(false);
 	const [jobSearchOpen, setJobSearchOpen] = useState(false);
 	const [detailJob, setDetailJob] = useState(null);
 
-	/* ── v0.0.7 Display Filter state ─────────────────────── */
+	/* ── v0.0.8 Display Filter state ─────────────────────── */
 	const [displayFilter, setDisplayFilter] = useState(null);
 	// displayFilter shape: { timeSlots: [], jobTypes: [], routeCriteria: [], techIds: [] } or null
 
-	/* ── v0.0.7 Override Warning ──────────────────────────── */
+	/* ── v0.0.8 Override Warning ──────────────────────────── */
 	const [overrideWarning, setOverrideWarning] = useState(null);
 	// shape: { jobIds, techId, techName, issues: [{label, pass}] }
 
@@ -70,10 +78,40 @@ export default function Dashboard() {
 
 	/* ── Drag ─────────────────────────────────────────────── */
 	const [dragJob, setDragJob] = useState(null);
-	const [dragPos, setDragPos] = useState(null);
 	const techPaneRef = useRef(null);
+	const techGridRef = useRef(null);
+	const jobGridRef = useRef(null);
+	const focusedGridRef = useRef('jobs'); // 'techs' | 'jobs'
 	const dragJobRef = useRef(null);
+	const dragGhostRef = useRef(null);
+	const selJobsRef = useRef(selJobs);
 	useEffect(() => { dragJobRef.current = dragJob; }, [dragJob]);
+	useEffect(() => { selJobsRef.current = selJobs; }, [selJobs]);
+
+	/* ── Demo mode ───────────────────────────────────────── */
+	const [isDemo, setIsDemo] = useState(false);
+	useEffect(() => {
+		api.simStatus().then((r) => {
+			if (r.data.is_demo) { setIsDemo(true); setViewDate(new Date()); }
+		}).catch(() => {});
+	}, []);
+
+	/* ── Simulation state ────────────────────────────────── */
+	const [simElapsed, setSimElapsed] = useState(null); // elapsed minutes since 08:00 virtual
+	const [overrunMap, setOverrunMap] = useState(() => new Map());
+	const [demoLocked, setDemoLocked] = useState(false);
+
+	/* ── Real clock ───────────────────────────────────────── */
+	const [realClock, setRealClock] = useState(() => new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+	useEffect(() => {
+		const i = setInterval(() => setRealClock(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })), 10000);
+		return () => clearInterval(i);
+	}, []);
+	// Refs so handleSimEvent never goes stale without re-registering the WS listener
+	const loadDataRef = useRef(null);
+	const toastRef = useRef(null);
+	const techsRef = useRef([]);
+	const fJobsRef = useRef([]);
 
 	/* ── Filters (dashboard bar) ─────────────────────────── */
 	const [jobFilter, setJobFilter] = useState(null);
@@ -91,7 +129,8 @@ export default function Dashboard() {
 	/* ── Data loading ─────────────────────────────────────── */
 	const loadData = useCallback(async (showRefresh = false) => {
 		if (showRefresh) setRefreshing(true);
-		const d = fmtDate(viewDate);
+		// Demo seeds use UTC date; use UTC to match regardless of local timezone
+		const d = isDemo ? fmtUTCDate(new Date()) : fmtDate(viewDate);
 		try {
 			const [tr, jr, sr] = await Promise.all([
 				api.getTechnicians(),
@@ -108,10 +147,37 @@ export default function Dashboard() {
 			setLoading(false);
 			setRefreshing(false);
 		}
-	}, [viewDate, toast]);
+	}, [viewDate, toast, isDemo]);
 
 	useEffect(() => { setLoading(true); loadData(); }, [viewDate]); // eslint-disable-line
 	useEffect(() => { const i = setInterval(() => loadData(), 30000); return () => clearInterval(i); }, [loadData]);
+
+	// Keep refs current so the stable WS handler always calls latest versions
+	useEffect(() => { loadDataRef.current = loadData; }, [loadData]);
+	useEffect(() => { toastRef.current = toast; }, [toast]);
+	useEffect(() => { techsRef.current = techs; }, [techs]);
+
+	/* ── Sim event handler (stable ref — never re-registers WS) ── */
+	const handleSimEvent = useCallback((ev) => {
+		if (ev.event_type === 'clock_tick') {
+			setSimElapsed(ev.details?.elapsed_minutes ?? null);
+		} else if (ev.event_type === 'job_assigned' || ev.event_type === 'job_started') {
+			loadDataRef.current?.();
+		} else if (ev.event_type === 'job_completed') {
+			setOverrunMap((prev) => { const next = new Map(prev); next.delete(ev.job_id); return next; });
+			loadDataRef.current?.();
+		} else if (ev.event_type === 'overrun_warning') {
+			setOverrunMap((prev) => { const next = new Map(prev); next.set(ev.job_id, ev.details?.severity ?? 'yellow'); return next; });
+		} else if (ev.event_type === 'scripted_beat') {
+			toastRef.current?.(ev.details?.description ?? 'Scripted event fired', 'info');
+			loadDataRef.current?.();
+		} else if (ev.event_type === 'day_complete') {
+			toastRef.current?.('Demo day complete — all jobs finished', 'success');
+			loadDataRef.current?.();
+		}
+	}, []); // stable — reads latest via refs
+
+	useSimEvents(handleSimEvent);
 
 	/* ── Close context menu ───────────────────────────────── */
 	useEffect(() => { const c = () => setCtxMenu(null); document.addEventListener('click', c); return () => document.removeEventListener('click', c); }, []);
@@ -123,6 +189,17 @@ export default function Dashboard() {
 			// Don't process shortcuts if inside a floating window
 			if (e.target.closest('.fw-window') || e.target.closest('.fw-filter') || e.target.closest('.fw-personnel') || e.target.closest('.fw-job-search') || e.target.closest('.fw-job-detail')) return;
 			if (e.key === 'Escape') { setCtxMenu(null); setMapOpen(false); setDetailJob(null); setFilterOpen(false); setPersonnelOpen(false); setJobSearchOpen(false); }
+			if (e.key === 'a' && (e.ctrlKey || e.metaKey)) {
+				e.preventDefault();
+				if (focusedGridRef.current === 'techs') {
+					setSelTechs((techsRef.current || []).map((t) => t.id));
+					techGridRef.current?.selectAll();
+				} else {
+					setSelJobs((fJobsRef.current || []).map((j) => j.id));
+					jobGridRef.current?.selectAll();
+				}
+				return;
+			}
 			if (e.key === 'r' && !e.ctrlKey && !e.metaKey) loadData(true);
 			if (e.key === 'm' && !e.ctrlKey && !e.metaKey) setMapOpen((p) => !p);
 			if (e.key === 't' && !e.ctrlKey && !e.metaKey) setTimelineOpen((p) => !p);
@@ -141,38 +218,81 @@ export default function Dashboard() {
 	/* ── Drag system ─────────────────────────────────────── */
 	useEffect(() => {
 		if (!dragJob) return;
-		const onMove = (e) => setDragPos({ x: e.clientX, y: e.clientY });
-		const onUp = (e) => {
+		const ghost = dragGhostRef.current;
+
+		const updateGhost = (clientX, clientY) => {
+			if (!ghost) return;
+			const currentJob = dragJobRef.current;
+			const currentSel = selJobsRef.current;
+			ghost.style.left = `${clientX + 12}px`;
+			ghost.style.top = `${clientY - 10}px`;
+			ghost.style.display = 'block';
+			ghost.textContent = currentSel.length > 1 && currentJob && currentSel.includes(currentJob.id)
+				? `${currentSel.length} jobs`
+				: currentJob ? `Job #${currentJob.job_number || currentJob.id} — ${currentJob.customer_name}` : '';
+		};
+
+		const dropAt = (clientX, clientY) => {
 			const job = dragJobRef.current;
-			const pane = techPaneRef.current;
-			if (job && pane) {
-				const el = document.elementFromPoint(e.clientX, e.clientY);
-				const row = el?.closest('.ag-row');
-				if (row && pane.contains(row)) {
-					const techId = row.getAttribute('data-tech-id');
-					if (techId) {
-						const ids = selJobs.length > 0 && selJobs.includes(job.id) ? selJobs : [job.id];
-						doAssignWithCheck(ids, Number(techId));
+			if (job && techGridRef.current) {
+				const pane = techPaneRef.current;
+				const el = document.elementFromPoint(clientX, clientY);
+				if (pane?.contains(el)) {
+					const techId = techGridRef.current.getTechIdAtPoint(clientX, clientY);
+					if (techId != null) {
+						const currentSel = selJobsRef.current;
+						const ids = currentSel.length > 0 && currentSel.includes(job.id) ? currentSel : [job.id];
+						doAssignWithCheck(ids, techId);
 					}
 				}
 			}
+			if (ghost) ghost.style.display = 'none';
 			setDragJob(null);
-			setDragPos(null);
 			document.body.style.userSelect = '';
 			document.body.style.cursor = '';
 		};
+
+		// Mouse handlers
+		const onMove = (e) => updateGhost(e.clientX, e.clientY);
+		const onUp = (e) => dropAt(e.clientX, e.clientY);
+
+		// Touch handlers
+		const onTouchMove = (e) => {
+			e.preventDefault();
+			const t = e.touches[0];
+			updateGhost(t.clientX, t.clientY);
+		};
+		const onTouchEnd = (e) => {
+			const t = e.changedTouches[0];
+			dropAt(t.clientX, t.clientY);
+		};
+
 		document.addEventListener('mousemove', onMove);
 		document.addEventListener('mouseup', onUp);
+		document.addEventListener('touchmove', onTouchMove, { passive: false });
+		document.addEventListener('touchend', onTouchEnd);
 		return () => {
 			document.removeEventListener('mousemove', onMove);
 			document.removeEventListener('mouseup', onUp);
+			document.removeEventListener('touchmove', onTouchMove);
+			document.removeEventListener('touchend', onTouchEnd);
+			if (ghost) ghost.style.display = 'none';
 			document.body.style.userSelect = '';
 			document.body.style.cursor = '';
 		};
 	}, [dragJob]); // eslint-disable-line
 
 	/* ── Assign with CanDo override check ────────────────── */
+	// Block any assignment path while the demo is playing — drag-drop, context
+	// menu, override modal all funnel through doAssignWithCheck.
+	const demoLockedRef = useRef(false);
+	useEffect(() => { demoLockedRef.current = demoLocked; }, [demoLocked]);
+
 	const doAssignWithCheck = useCallback(async (jobIds, techId) => {
+		if (demoLockedRef.current) {
+			toastRef.current?.('Stop the demo to assign jobs', 'warning');
+			return;
+		}
 		const tech = techs.find((t) => t.id === techId);
 		if (!tech) return;
 
@@ -238,14 +358,14 @@ export default function Dashboard() {
 	const handleAutoRoute = useCallback(async () => {
 		setAutoRouting(true);
 		try {
-			const res = await api.autoRoute();
+			const res = await api.autoRoute({ target_date: fmtDate(viewDate) });
 			const a = res.data.jobs_assigned ?? 0;
 			const u = res.data.jobs_unassigned ?? 0;
 			toast(`Routed ${a} job${a !== 1 ? 's' : ''}${u > 0 ? ` · ${u} unassigned` : ''}`, a > 0 ? 'success' : 'warning');
 			await loadData(true);
 		} catch { toast('Auto-route failed', 'error'); }
 		finally { setAutoRouting(false); }
-	}, [loadData, toast]);
+	}, [loadData, toast, viewDate]);
 
 	/* ── Job actions ───────────────────────────────────────── */
 	const handleJobAction = useCallback(async (action, job) => {
@@ -399,67 +519,86 @@ export default function Dashboard() {
 		};
 	}, [tlDrag]);
 
+	/* ── Computed: apply display filter + dashboard filter ── */
+	const active = useMemo(() => techs.filter((t) => ['available', 'on_job', 'en_route'].includes(t.status)).length, [techs]);
+	const offDuty = useMemo(() => techs.filter((t) => t.status === 'off_duty').length, [techs]);
+
+	const fJobs = useMemo(() => {
+		let result = jobs;
+		if (displayFilter) {
+			result = result.filter((j) => {
+				const slot = j.time_slot_start && j.time_slot_end ? `${j.time_slot_start}–${j.time_slot_end}` : null;
+				if (slot && displayFilter.timeSlots.length > 0 && !displayFilter.timeSlots.includes(slot)) return false;
+				if (j.job_type && displayFilter.jobTypes.length > 0 && !displayFilter.jobTypes.includes(j.job_type)) return false;
+				if (j.route_criteria && displayFilter.routeCriteria.length > 0 && !displayFilter.routeCriteria.includes(j.route_criteria)) return false;
+				return true;
+			});
+		}
+		if (jobFilter) result = result.filter((j) => j.status === jobFilter);
+		return result;
+	}, [jobs, displayFilter, jobFilter]);
+
+	useEffect(() => { fJobsRef.current = fJobs; }, [fJobs]);
+
+	const fTechs = useMemo(() => {
+		let result = techs;
+		if (displayFilter?.techIds?.length > 0) result = result.filter((t) => displayFilter.techIds.includes(t.id));
+		if (techFilter === 'active') result = result.filter((t) => ['available', 'on_job', 'en_route'].includes(t.status));
+		else if (techFilter === 'off_duty') result = result.filter((t) => t.status === 'off_duty');
+		return result;
+	}, [techs, displayFilter, techFilter]);
+
+	const timelineTechs = useMemo(() => selTechs.length > 0 ? techs.filter((t) => selTechs.includes(t.id)) : [], [selTechs, techs]);
+
 	/* ── Loading ──────────────────────────────────────────── */
 	if (loading && techs.length === 0) return <div className="loading-screen"><div className="loading-spinner" />Loading FieldOpt...</div>;
 
-	/* ── Computed: apply display filter + dashboard filter ── */
 	const s = summary ?? {};
 	const pending = s.pending ?? 0, assigned = s.assigned ?? 0, inProg = s.in_progress ?? 0;
 	const completed = s.completed ?? 0, onHold = s.on_hold ?? 0;
-	const active = techs.filter((t) => ['available', 'on_job', 'en_route'].includes(t.status)).length;
-	const offDuty = techs.filter((t) => t.status === 'off_duty').length;
-
-	// Step 1: Apply display filter (from FilterWindow)
-	let filteredJobs = jobs;
-	let filteredTechs = techs;
-	if (displayFilter) {
-		filteredJobs = jobs.filter((j) => {
-			const slot = j.time_slot_start && j.time_slot_end ? `${j.time_slot_start}–${j.time_slot_end}` : null;
-			if (slot && displayFilter.timeSlots.length > 0 && !displayFilter.timeSlots.includes(slot)) return false;
-			if (j.job_type && displayFilter.jobTypes.length > 0 && !displayFilter.jobTypes.includes(j.job_type)) return false;
-			if (j.route_criteria && displayFilter.routeCriteria.length > 0 && !displayFilter.routeCriteria.includes(j.route_criteria)) return false;
-			return true;
-		});
-		filteredTechs = techs.filter((t) => {
-			if (displayFilter.techIds.length > 0 && !displayFilter.techIds.includes(t.id)) return false;
-			return true;
-		});
-	}
-
-	// Step 2: Apply dashboard bar filter on top
-	const fJobs = jobFilter ? filteredJobs.filter((j) => j.status === jobFilter) : filteredJobs;
-	const fTechs = techFilter === 'active'
-		? filteredTechs.filter((t) => ['available', 'on_job', 'en_route'].includes(t.status))
-		: techFilter === 'off_duty' ? filteredTechs.filter((t) => t.status === 'off_duty') : filteredTechs;
-
-	const timelineTechs = selTechs.length > 0 ? techs.filter((t) => selTechs.includes(t.id)) : [];
 
 	return (
-		<div className="app-shell">
+		<div className={`app-shell${demoLocked ? ' demo-locked' : ''}`}>
 			{/* ══ Header ══ */}
 			<header className="header-bar">
-				<div className="header-brand"><div className="header-brand-icon" />FieldOpt</div>
+				<div className="header-brand"><div className="header-brand-icon" />FieldOpt<span className="header-version">v{__APP_VERSION__}</span></div>
+				<span className="header-real-clock">{realClock}</span>
 				<div className="header-divider" />
 				<div className="day-picker">
-					<button className="day-picker-btn" onClick={() => goDay(-1)}>◂</button>
-					<button className={`day-picker-date${isToday ? ' day-picker-date--today' : ''}`} onClick={() => setViewDate(new Date())}>
-						{isToday ? 'Today' : fmtDateDisplay(viewDate)}
+					{!isDemo && <button className="day-picker-btn" onClick={() => goDay(-1)}>◂</button>}
+					<button
+						ref={calAnchorRef}
+						className={`day-picker-date${isToday ? ' day-picker-date--today' : ''}${isDemo ? ' day-picker-date--locked' : ''}`}
+						onClick={() => !isDemo && setCalOpen((p) => !p)}
+					>
+						{isDemo ? 'Demo Day' : isToday ? 'Today' : fmtDateDisplay(viewDate)}
 					</button>
-					<button className="day-picker-btn" onClick={() => goDay(1)}>▸</button>
+					{!isDemo && <button className="day-picker-btn" onClick={() => goDay(1)}>▸</button>}
+					{!isDemo && calOpen && (
+						<CalendarPicker
+							value={viewDate}
+							onChange={(d) => setViewDate(d)}
+							onClose={() => setCalOpen(false)}
+							anchorRef={calAnchorRef}
+						/>
+					)}
 				</div>
 				<div className="header-actions">
-					<button className={`btn${filterOpen ? ' btn--primary' : ''}`} onClick={() => setFilterOpen((p) => !p)}><FilterIcon />Filter</button>
-					<button className={`btn${personnelOpen ? ' btn--primary' : ''}`} onClick={() => setPersonnelOpen((p) => !p)}><PersonnelIcon />Personnel</button>
-					<button className={`btn${jobSearchOpen ? ' btn--primary' : ''}`} onClick={() => setJobSearchOpen((p) => !p)}><SearchIcon />Job Search</button>
+					<button className={`btn${filterOpen ? ' btn--primary' : ''}`} onClick={() => setFilterOpen((p) => !p)} disabled={demoLocked}><FilterIcon /><span className="btn-label">Filter</span></button>
+					<button className={`btn${personnelOpen ? ' btn--primary' : ''}`} onClick={() => setPersonnelOpen((p) => !p)} disabled={demoLocked}><PersonnelIcon /><span className="btn-label">Personnel</span></button>
+					<button className={`btn${jobSearchOpen ? ' btn--primary' : ''}`} onClick={() => setJobSearchOpen((p) => !p)} disabled={demoLocked}><SearchIcon /><span className="btn-label">Job Search</span></button>
 					<div className="header-divider" />
-					<button className={`btn${timelineOpen ? ' btn--primary' : ''}`} onClick={() => setTimelineOpen((p) => !p)}><TimelineIcon />Timeline</button>
-					<button className={`btn${mapOpen ? ' btn--primary' : ''}`} onClick={() => setMapOpen((p) => !p)}><MapIcon />Map</button>
-					<button className="btn" onClick={() => loadData(true)} disabled={refreshing}><RefreshIcon spinning={refreshing} />Refresh</button>
-					<button className="btn btn--warning" onClick={() => setAutoRouteConfirm(true)} disabled={autoRouting || pending === 0}>
-						<BoltIcon />{autoRouting ? 'Routing...' : `Auto-Route ${pending}`}
+					<button className={`btn${timelineOpen ? ' btn--primary' : ''}`} onClick={() => setTimelineOpen((p) => !p)}><TimelineIcon /><span className="btn-label">Timeline</span></button>
+					<button className={`btn${mapOpen ? ' btn--primary' : ''}`} onClick={() => setMapOpen((p) => !p)}><MapIcon /><span className="btn-label">Map</span></button>
+					<button className="btn" onClick={() => loadData(true)} disabled={refreshing}><RefreshIcon spinning={refreshing} /><span className="btn-label">Refresh</span></button>
+					<button className="btn btn--warning" onClick={() => setAutoRouteConfirm(true)} disabled={demoLocked || autoRouting || pending === 0}>
+						<BoltIcon /><span className="btn-label">{autoRouting ? 'Routing...' : `Auto-Route ${pending}`}</span>
 					</button>
 				</div>
 			</header>
+
+			{/* ══ Sim Bar (demo mode only) ══ */}
+			<SimBar elapsedMinutes={simElapsed} onToast={toast} onRunningChange={setDemoLocked} />
 
 			{/* ══ Dashboard Bar ══ */}
 			<div className="dashboard-bar">
@@ -486,7 +625,7 @@ export default function Dashboard() {
 			{/* ══ Split Panes ══ */}
 			<div className="split-container" ref={splitRef}>
 				{/* Tech pane */}
-				<div className="pane" style={{ flex: `0 0 ${splitRatio * 100}%` }}>
+				<div className="pane" style={{ flex: `0 0 ${splitRatio * 100}%` }} onMouseDown={() => { focusedGridRef.current = 'techs'; }} onTouchStart={() => { focusedGridRef.current = 'techs'; }}>
 					<div className="pane-header">
 						<span className="pane-title">Technicians</span>
 						<span className="pane-count">{fTechs.length}{(techFilter || displayFilter) ? ` / ${techs.length}` : ''}</span>
@@ -494,6 +633,7 @@ export default function Dashboard() {
 					</div>
 					<div className="pane-body" ref={techPaneRef}>
 						<TechGrid
+							ref={techGridRef}
 							technicians={fTechs}
 							selectedIds={selTechs}
 							onRowClicked={handleTechClick}
@@ -508,7 +648,7 @@ export default function Dashboard() {
 				</div>
 
 				{/* Job pane */}
-				<div className="pane" style={{ flex: 1 }}>
+				<div className="pane" style={{ flex: 1 }} onMouseDown={() => { focusedGridRef.current = 'jobs'; }} onTouchStart={() => { focusedGridRef.current = 'jobs'; }}>
 					<div className="pane-header">
 						<span className="pane-title">Jobs</span>
 						<span className="pane-count">{fJobs.length}{(jobFilter || displayFilter) ? ` / ${jobs.length}` : ''}</span>
@@ -516,12 +656,15 @@ export default function Dashboard() {
 					</div>
 					<div className="pane-body">
 						<JobGrid
+							ref={jobGridRef}
 							jobs={fJobs}
 							selectedIds={selJobs}
 							onRowClicked={handleJobClick}
 							onContextMenu={(e, j) => { e.preventDefault(); setCtxMenu({ x: e.clientX, y: e.clientY, type: 'job', data: j }); }}
-							onDragStart={(job) => { setDragJob(job); setDragPos(null); }}
+							onDragStart={(job) => { setDragJob(job); }}
 							onRowDoubleClicked={handleJobDoubleClick}
+							overrunMap={overrunMap}
+							simElapsed={simElapsed}
 						/>
 					</div>
 				</div>
@@ -543,14 +686,8 @@ export default function Dashboard() {
 				)}
 			</div>
 
-			{/* ══ Drag Ghost ══ */}
-			{dragJob && dragPos && (
-				<div className="drag-ghost" style={{ left: dragPos.x + 12, top: dragPos.y - 10 }}>
-					{selJobs.length > 1 && selJobs.includes(dragJob.id)
-						? `${selJobs.length} jobs`
-						: `Job #${dragJob.job_number || dragJob.id} — ${dragJob.customer_name}`}
-				</div>
-			)}
+			{/* ══ Drag Ghost — position written via ref to avoid re-renders ══ */}
+			<div ref={dragGhostRef} className="drag-ghost" style={{ display: 'none' }} />
 
 			{/* ══ Map ══ */}
 			{mapOpen && <MapWindow technicians={techs} jobs={jobs} onClose={() => setMapOpen(false)} />}
@@ -568,7 +705,7 @@ export default function Dashboard() {
 				/>
 			)}
 
-			{/* ══ v0.0.7 Windows ══ */}
+			{/* ══ v0.0.8 Windows ══ */}
 			{filterOpen && (
 				<FilterWindow
 					jobs={jobs}
@@ -594,7 +731,7 @@ export default function Dashboard() {
 					viewDate={viewDate}
 					onClose={() => setJobSearchOpen(false)}
 					onJobDetail={(job) => setDetailJob(job)}
-					onDragStart={(job) => { setDragJob(job); setDragPos(null); }}
+					onDragStart={(job) => { setDragJob(job); }}
 					onContextMenu={(e, j) => { e.preventDefault(); setCtxMenu({ x: e.clientX, y: e.clientY, type: 'job', data: j }); }}
 				/>
 			)}

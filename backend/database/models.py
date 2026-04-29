@@ -4,7 +4,8 @@ SQLAlchemy ORM models for technicians, jobs, and assignments
 """
 from datetime import datetime
 from typing import Optional, List
-from sqlalchemy import String, Integer, Float, Boolean, DateTime, Enum, ForeignKey, JSON, Text
+from sqlalchemy import String, Integer, Float, Boolean, DateTime, Enum, ForeignKey, Text
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 import enum
 
@@ -76,11 +77,18 @@ class Technician(Base):
 	home_longitude: Mapped[float] = mapped_column(Float, nullable=False)
 	home_address: Mapped[Optional[str]] = mapped_column(String(255))
 
-	# Skills (stored as JSON array of skill strings)
-	skills: Mapped[list] = mapped_column(JSON, default=list, nullable=False)
+	# Skills (stored as JSONB array of skill strings)
+	skills: Mapped[list] = mapped_column(JSONB, default=list, nullable=False)
 
 	# Assigned Routes — management areas this tech works (e.g. ["MN-HARLEM", "MN-WASH-HTS"])
-	assigned_routes: Mapped[list] = mapped_column(JSON, default=list, nullable=False)
+	assigned_routes: Mapped[list] = mapped_column(JSONB, default=list, nullable=False)
+
+	# Performance Modifiers — used by the duration sampler and, later, by the ML model.
+	# speed_factor is a global multiplier on sampled durations (1.0 = nominal; <1.0 faster, >1.0 slower).
+	# skill_bonuses stacks on top, keyed by JobType value (e.g. {"install": 0.85, "repair": 1.2}).
+	# Both are "ground truth" tech attributes — hidden from the dispatcher view, visible in God View.
+	speed_factor: Mapped[float] = mapped_column(Float, default=1.0, nullable=False)
+	skill_bonuses: Mapped[dict] = mapped_column(JSONB, default=dict, nullable=False)
 
 	# Schedule
 	shift_start: Mapped[Optional[str]] = mapped_column(String(5))  # HH:MM format
@@ -144,8 +152,8 @@ class Job(Base):
 	latitude: Mapped[float] = mapped_column(Float, nullable=False)
 	longitude: Mapped[float] = mapped_column(Float, nullable=False)
 
-	# Required Skills (stored as JSON array)
-	required_skills: Mapped[list] = mapped_column(JSON, default=list, nullable=False)
+	# Required Skills (stored as JSONB array)
+	required_skills: Mapped[list] = mapped_column(JSONB, default=list, nullable=False)
 
 	# Route Criteria — management area / geographic zone (e.g. "MN-HARLEM", "BK-EAST")
 	route_criteria: Mapped[Optional[str]] = mapped_column(String(50), index=True)
@@ -213,6 +221,7 @@ class Assignment(Base):
 	actual_travel_time: Mapped[Optional[int]] = mapped_column(Integer)
 	actual_arrival: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
 	actual_completion: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+	actual_duration_minutes: Mapped[Optional[int]] = mapped_column(Integer)  # minutes on-site; sim ground truth in demo, tech check-out in prod
 
 	# Metadata
 	created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)

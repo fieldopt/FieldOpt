@@ -1,4 +1,4 @@
-import { useMemo, useRef, useCallback, useEffect } from 'react';
+import { useMemo, useRef, useCallback, useEffect, forwardRef, useImperativeHandle } from 'react';
 import { AgGridReact } from 'ag-grid-react';
 import { AllCommunityModule, ModuleRegistry } from 'ag-grid-community';
 
@@ -38,14 +38,36 @@ function JobCountCellRenderer({ data }) {
 	);
 }
 
-export default function TechGrid({ technicians, selectedIds = [], onRowClicked, onContextMenu, isDragTarget }) {
+const TechGrid = forwardRef(function TechGrid({ technicians, selectedIds = [], onRowClicked, onContextMenu, isDragTarget }, ref) {
 	const gridRef = useRef(null);
 	const containerRef = useRef(null);
+
+	// Expose a point-to-tech-id lookup so Dashboard can resolve drop targets without
+	// stamping data-tech-id on every scroll frame.
+	useImperativeHandle(ref, () => ({
+		getTechIdAtPoint: (x, y) => {
+			const el = document.elementFromPoint(x, y);
+			const row = el?.closest('.ag-row');
+			if (!row) return null;
+			const idx = Number(row.getAttribute('row-index'));
+			const node = gridRef.current?.api?.getDisplayedRowAtIndex(idx);
+			return node?.data?.id ?? null;
+		},
+		selectAll: () => {
+			gridRef.current?.api?.selectAll();
+		},
+	}), []);
 
 	const columnDefs = useMemo(() => [
 		{
 			headerName: 'Tech ID', width: 85, pinned: 'left', sort: 'asc',
 			valueGetter: (p) => p.data?.employee_id || String(p.data?.id),
+			comparator: (a, b) => {
+				// Numeric prefix sort: "MD001" → split letters/digits; pure numbers → numeric
+				const na = parseInt(a, 10), nb = parseInt(b, 10);
+				if (!isNaN(na) && !isNaN(nb)) return na - nb;
+				return a.localeCompare(b);
+			},
 			cellStyle: { fontFamily: 'var(--font-mono)', fontSize: 'var(--font-size-xs)' },
 		},
 		{ field: 'name', headerName: 'Name', minWidth: 150, flex: 1, pinned: 'left' },
@@ -87,18 +109,14 @@ export default function TechGrid({ technicians, selectedIds = [], onRowClicked, 
 		enableClickSelection: false,
 	}), []);
 
-	// Sync AG Grid's internal selection with our selectedIds prop
+	// Sync AG Grid selection — O(1) per selected ID via getRowNode hash lookup
 	useEffect(() => {
 		const gridApi = gridRef.current?.api;
 		if (!gridApi) return;
 		gridApi.deselectAll();
-		if (selectedIds.length > 0) {
-			gridApi.forEachNode((node) => {
-				if (node.data && selectedIds.includes(node.data.id)) {
-					node.setSelected(true, false, 'api');
-				}
-			});
-		}
+		selectedIds.forEach((id) => {
+			gridApi.getRowNode(String(id))?.setSelected(true, false, 'api');
+		});
 	}, [selectedIds, technicians]);
 
 	const onCellContextMenu = useCallback((p) => {
@@ -115,20 +133,6 @@ export default function TechGrid({ technicians, selectedIds = [], onRowClicked, 
 			onRowClicked(p.data.id, p.event, displayedIds);
 		}
 	}, [onRowClicked]);
-
-	// Stamp data-tech-id on rows for drag-drop target detection
-	const stampTechIds = useCallback(() => {
-		requestAnimationFrame(() => {
-			const gridApi = gridRef.current?.api;
-			const el = containerRef.current;
-			if (!gridApi || !el) return;
-			el.querySelectorAll('.ag-row').forEach((rowEl) => {
-				const idx = Number(rowEl.getAttribute('row-index'));
-				const node = gridApi.getDisplayedRowAtIndex(idx);
-				if (node?.data) rowEl.setAttribute('data-tech-id', String(node.data.id));
-			});
-		});
-	}, []);
 
 	return (
 		<div
@@ -151,12 +155,9 @@ export default function TechGrid({ technicians, selectedIds = [], onRowClicked, 
 				onCellContextMenu={onCellContextMenu}
 				onRowClicked={handleRowClicked}
 				preventDefaultOnContextMenu={true}
-				onRowDataUpdated={stampTechIds}
-				onFirstDataRendered={stampTechIds}
-				onSortChanged={stampTechIds}
-				onFilterChanged={stampTechIds}
-				onBodyScroll={stampTechIds}
 			/>
 		</div>
 	);
-}
+});
+
+export default TechGrid;

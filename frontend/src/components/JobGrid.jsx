@@ -1,4 +1,4 @@
-import { useMemo, useRef, useCallback, useEffect } from 'react';
+import { useMemo, useRef, useCallback, useEffect, forwardRef, useImperativeHandle } from 'react';
 import { AgGridReact } from 'ag-grid-react';
 import { AllCommunityModule, ModuleRegistry } from 'ag-grid-community';
 
@@ -58,13 +58,22 @@ function DateCellRenderer({ value }) {
 	);
 }
 
-export default function JobGrid({ jobs, selectedIds = [], onRowClicked, onContextMenu, onDragStart, onRowDoubleClicked }) {
+const JobGrid = forwardRef(function JobGrid({ jobs, selectedIds = [], onRowClicked, onContextMenu, onDragStart, onRowDoubleClicked, overrunMap, simElapsed }, ref) {
 	const gridRef = useRef(null);
+
+	useImperativeHandle(ref, () => ({
+		selectAll: () => { gridRef.current?.api?.selectAll(); },
+	}), []);
 
 	const columnDefs = useMemo(() => [
 		{
 			headerName: 'Job ID', width: 85, pinned: 'left', sort: 'asc',
 			valueGetter: (p) => p.data?.job_number || String(p.data?.id),
+			comparator: (a, b) => {
+				const na = parseInt(a, 10), nb = parseInt(b, 10);
+				if (!isNaN(na) && !isNaN(nb)) return na - nb;
+				return a.localeCompare(b);
+			},
 			cellStyle: { fontFamily: 'var(--font-mono)', fontSize: 'var(--font-size-xs)' },
 		},
 		{ field: 'job_type', headerName: 'Type', width: 100, cellRenderer: JobTypeCellRenderer },
@@ -118,18 +127,14 @@ export default function JobGrid({ jobs, selectedIds = [], onRowClicked, onContex
 		enableClickSelection: false,
 	}), []);
 
-	// Sync AG Grid selection with our selectedIds prop
+	// Sync AG Grid selection — O(1) per selected ID via getRowNode hash lookup
 	useEffect(() => {
 		const gridApi = gridRef.current?.api;
 		if (!gridApi) return;
 		gridApi.deselectAll();
-		if (selectedIds.length > 0) {
-			gridApi.forEachNode((node) => {
-				if (node.data && selectedIds.includes(node.data.id)) {
-					node.setSelected(true, false, 'api');
-				}
-			});
-		}
+		selectedIds.forEach((id) => {
+			gridApi.getRowNode(String(id))?.setSelected(true, false, 'api');
+		});
 	}, [selectedIds, jobs]);
 
 	const onCellContextMenu = useCallback((p) => {
@@ -146,7 +151,7 @@ export default function JobGrid({ jobs, selectedIds = [], onRowClicked, onContex
 		}
 	}, [onRowClicked]);
 
-	// Drag initiation — simple mousedown with 8px threshold
+	// Drag initiation — mousedown with 8px threshold
 	const handleMouseDown = useCallback((e) => {
 		if (e.button !== 0) return;
 		if (e.target.closest('.ag-header')) return;
@@ -165,7 +170,6 @@ export default function JobGrid({ jobs, selectedIds = [], onRowClicked, onContex
 				const idx = Number(rowEl.getAttribute('row-index'));
 				const node = gridRef.current?.api?.getDisplayedRowAtIndex(idx);
 				if (node?.data && onDragStart) {
-					// Prevent text selection immediately
 					document.body.style.userSelect = 'none';
 					document.body.style.cursor = 'grabbing';
 					onDragStart(node.data);
@@ -182,6 +186,44 @@ export default function JobGrid({ jobs, selectedIds = [], onRowClicked, onContex
 		document.addEventListener('mouseup', onUp);
 	}, [onDragStart]);
 
+	// Touch drag initiation — long-press 200ms threshold
+	const handleTouchStart = useCallback((e) => {
+		if (e.target.closest('.ag-header')) return;
+		const rowEl = e.target.closest('.ag-row');
+		if (!rowEl) return;
+
+		const t0 = e.touches[0];
+		const startX = t0.clientX;
+		const startY = t0.clientY;
+		let timer = null;
+		let fired = false;
+
+		const cancel = () => {
+			clearTimeout(timer);
+			rowEl.removeEventListener('touchmove', onTouchMove);
+			rowEl.removeEventListener('touchend', cancel);
+		};
+		const onTouchMove = (ev) => {
+			const t = ev.touches[0];
+			if (Math.abs(t.clientX - startX) + Math.abs(t.clientY - startY) > 10) cancel();
+		};
+
+		timer = setTimeout(() => {
+			if (fired) return;
+			fired = true;
+			const idx = Number(rowEl.getAttribute('row-index'));
+			const node = gridRef.current?.api?.getDisplayedRowAtIndex(idx);
+			if (node?.data && onDragStart) {
+				if (navigator.vibrate) navigator.vibrate(30);
+				onDragStart(node.data);
+			}
+			cancel();
+		}, 200);
+
+		rowEl.addEventListener('touchmove', onTouchMove, { passive: true });
+		rowEl.addEventListener('touchend', cancel, { once: true });
+	}, [onDragStart]);
+
 	const handleDoubleClick = useCallback((p) => {
 		if (p.data && onRowDoubleClicked) onRowDoubleClicked(p.data);
 	}, [onRowDoubleClicked]);
@@ -191,6 +233,7 @@ export default function JobGrid({ jobs, selectedIds = [], onRowClicked, onContex
 			className="ag-theme-fieldopt"
 			style={{ width: '100%', height: '100%' }}
 			onMouseDown={handleMouseDown}
+			onTouchStart={handleTouchStart}
 		>
 			<AgGridReact
 				ref={gridRef}
@@ -204,6 +247,21 @@ export default function JobGrid({ jobs, selectedIds = [], onRowClicked, onContex
 				headerHeight={28}
 				rowHeight={26}
 				suppressCellFocus={true}
+				rowClassRules={{
+					'row--overrun-yellow': (p) => overrunMap?.get(p.data?.id) === 'yellow',
+					'row--overrun-red': (p) => overrunMap?.get(p.data?.id) === 'red',
+					'row--overdue': (p) => {
+						if (simElapsed == null) return false;
+						const status = p.data?.status;
+						if (status === 'completed' || status === 'cancelled') return false;
+						const slotEnd = p.data?.time_slot_end;
+						if (!slotEnd) return false;
+						const [eh, em] = slotEnd.split(':').map(Number);
+						const slotEndMin = eh * 60 + em;
+						const nowMin = 8 * 60 + simElapsed;
+						return nowMin > slotEndMin;
+					},
+				}}
 				onCellContextMenu={onCellContextMenu}
 				onRowClicked={handleRowClicked}
 				onRowDoubleClicked={handleDoubleClick}
@@ -211,4 +269,6 @@ export default function JobGrid({ jobs, selectedIds = [], onRowClicked, onContex
 			/>
 		</div>
 	);
-}
+});
+
+export default JobGrid;

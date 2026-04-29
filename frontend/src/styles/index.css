@@ -1,5 +1,5 @@
 /* ================================================================
-   FieldOpt v0.0.7 — Enterprise Dispatch Console
+   FieldOpt v0.0.8 — Enterprise Dispatch Console
    Design System & Global Styles
    ================================================================ */
 
@@ -136,6 +136,21 @@ body {
 	background: var(--color-accent);
 	border-radius: 3px;
 	flex-shrink: 0;
+}
+
+.header-version {
+	font-size: var(--font-size-xs);
+	color: var(--text-muted);
+	font-weight: 400;
+	margin-left: 4px;
+}
+
+.header-real-clock {
+	font-size: var(--font-size-xs);
+	color: var(--text-muted);
+	font-weight: 500;
+	margin-left: 8px;
+	letter-spacing: 0.03em;
 }
 
 .header-divider {
@@ -391,6 +406,89 @@ body {
 	color: var(--color-accent);
 	border-color: var(--color-accent-dim);
 }
+
+.day-picker-date--locked {
+	cursor: default;
+	opacity: 0.75;
+	pointer-events: none;
+}
+
+/* --- Calendar Picker --- */
+.cal-picker {
+	z-index: 9999;
+	background: var(--surface-panel);
+	border: 1px solid var(--border-color);
+	border-radius: 6px;
+	padding: 10px;
+	box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+	min-width: 220px;
+}
+.cal-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	margin-bottom: 8px;
+}
+.cal-month-label {
+	font-size: var(--font-size-xs);
+	font-weight: 600;
+	color: var(--text-primary);
+}
+.cal-nav {
+	background: none;
+	border: none;
+	color: var(--text-secondary);
+	cursor: pointer;
+	padding: 2px 6px;
+	border-radius: 3px;
+	font-size: 11px;
+	line-height: 1;
+}
+.cal-nav:hover { background: var(--surface-row-hover); color: var(--text-primary); }
+.cal-grid {
+	display: grid;
+	grid-template-columns: repeat(7, 1fr);
+	gap: 2px;
+}
+.cal-dow {
+	font-size: 10px;
+	color: var(--text-muted);
+	text-align: center;
+	padding: 2px 0 4px;
+}
+.cal-day {
+	background: none;
+	border: none;
+	border-radius: 3px;
+	color: var(--text-secondary);
+	cursor: pointer;
+	font-size: var(--font-size-xs);
+	padding: 4px 2px;
+	text-align: center;
+	line-height: 1;
+}
+.cal-day:hover { background: var(--surface-row-hover); color: var(--text-primary); }
+.cal-day--today { color: var(--color-accent); font-weight: 600; }
+.cal-day--selected {
+	background: var(--color-accent);
+	color: #fff;
+	font-weight: 600;
+}
+.cal-day--selected:hover { background: var(--color-accent); }
+.cal-footer {
+	margin-top: 8px;
+	text-align: center;
+}
+.cal-today-btn {
+	background: none;
+	border: 1px solid var(--border-color);
+	border-radius: 3px;
+	color: var(--text-secondary);
+	cursor: pointer;
+	font-size: 10px;
+	padding: 3px 10px;
+}
+.cal-today-btn:hover { border-color: var(--color-accent); color: var(--color-accent); }
 
 /* --- Row Selection Enhancement --- */
 .ag-theme-fieldopt .ag-row-selected {
@@ -1678,4 +1776,305 @@ body {
 	display: flex;
 	justify-content: flex-end;
 	gap: var(--space-md);
+}
+
+/* --- Simulation Bar --- */
+.sim-bar {
+	height: 32px;
+	min-height: 32px;
+	background: var(--surface-panel-alt);
+	border-bottom: 1px solid var(--border-color);
+	display: flex;
+	align-items: center;
+	padding: 0 var(--space-lg);
+	gap: var(--space-lg);
+	user-select: none;
+	overflow-x: auto;
+	overflow-y: hidden;
+	scrollbar-width: none;
+}
+.sim-bar::-webkit-scrollbar { display: none; }
+
+.sim-demo-badge {
+	font-size: 9px;
+	font-weight: 800;
+	letter-spacing: 0.12em;
+	padding: 2px 7px;
+	border-radius: 3px;
+	background: var(--color-warning-dim);
+	color: var(--color-warning);
+	border: 1px solid var(--color-warning);
+	text-transform: uppercase;
+	flex-shrink: 0;
+}
+
+.sim-status {
+	font-size: 10px;
+	font-weight: 700;
+	letter-spacing: 0.06em;
+	padding: 2px 8px;
+	border-radius: 3px;
+	font-family: var(--font-mono);
+	flex-shrink: 0;
+}
+.sim-status--running {
+	color: var(--color-success);
+	background: var(--color-success-dim);
+}
+.sim-status--paused {
+	color: var(--color-warning);
+	background: var(--color-warning-dim);
+}
+.sim-status--stopped {
+	color: var(--text-muted);
+	background: rgba(122, 126, 136, 0.12);
+}
+
+.sim-clock {
+	font-family: var(--font-mono);
+	font-size: var(--font-size-lg);
+	font-weight: 600;
+	color: var(--text-primary);
+	letter-spacing: 0.05em;
+	min-width: 50px;
+	flex-shrink: 0;
+}
+
+.sim-controls {
+	display: flex;
+	align-items: center;
+	gap: var(--space-sm);
+	flex-shrink: 0;
+}
+
+.sim-speed {
+	display: flex;
+	align-items: center;
+	gap: var(--space-sm);
+	margin-left: auto;
+	flex-shrink: 0;
+}
+
+.sim-speed-label {
+	font-size: var(--font-size-xs);
+	color: var(--text-muted);
+}
+
+.sim-speed-select {
+	background: var(--surface-input);
+	border: 1px solid var(--border-color);
+	border-radius: var(--border-radius);
+	color: var(--text-primary);
+	font-family: var(--font-mono);
+	font-size: var(--font-size-xs);
+	padding: 2px 6px;
+	cursor: pointer;
+}
+.sim-speed-select:disabled {
+	opacity: 0.4;
+	cursor: not-allowed;
+}
+
+/* --- Overrun row colors --- */
+.ag-theme-fieldopt .row--overrun-yellow {
+	background: var(--color-warning-dim) !important;
+}
+.ag-theme-fieldopt .row--overrun-yellow:hover {
+	background: rgba(229, 168, 52, 0.22) !important;
+}
+.ag-theme-fieldopt .row--overrun-red {
+	background: var(--color-danger-dim) !important;
+}
+.ag-theme-fieldopt .row--overrun-red:hover {
+	background: rgba(224, 85, 85, 0.22) !important;
+}
+
+/* Past-time-frame indicator: job's customer window has closed and the
+   job isn't completed/cancelled yet. Distinct from overrun (which is
+   in-progress past estimated_duration). */
+.ag-theme-fieldopt .row--overdue {
+	box-shadow: inset 3px 0 0 var(--color-danger);
+	background: rgba(224, 85, 85, 0.08) !important;
+}
+.ag-theme-fieldopt .row--overdue:hover {
+	background: rgba(224, 85, 85, 0.14) !important;
+}
+
+/* Demo playback lock — only blocks assignment-changing UI. Tech/job grids,
+   timeline, map, refresh stay interactive so the dispatcher can watch.
+   Block list (handled via `disabled` props + handler guards):
+     - Filter / Personnel / Job Search / Auto-Route buttons
+     - Drag-drop assign + context-menu assign + override-warning confirm
+*/
+.app-shell.demo-locked::after {
+	content: 'DEMO PLAYING — controls locked';
+	position: fixed;
+	bottom: 12px;
+	right: 12px;
+	background: var(--color-warning, #d99a00);
+	color: #000;
+	padding: 6px 12px;
+	border-radius: 6px;
+	font-size: 12px;
+	font-weight: 600;
+	letter-spacing: 0.5px;
+	z-index: 9999;
+	pointer-events: none;
+}
+
+/* btn--success + btn--danger variants */
+.btn--success {
+	border-color: var(--color-success);
+	color: var(--color-success);
+}
+.btn--success:hover {
+	background: var(--color-success-dim);
+}
+.btn--danger {
+	border-color: var(--color-danger);
+	color: var(--color-danger);
+}
+.btn--danger:hover {
+	background: var(--color-danger-dim);
+}
+
+/* ================================================================
+   Mobile / Touch Responsive
+   ================================================================ */
+
+@media (max-width: 768px) {
+	/* Bigger touch targets on buttons */
+	.btn {
+		padding: 8px 12px;
+		min-height: 40px;
+		font-size: var(--font-size-sm);
+	}
+
+	/* Hide text labels — icons only */
+	.btn-label {
+		display: none;
+	}
+
+	/* Hide version badge */
+	.header-version {
+		display: none;
+	}
+
+	/* Header: reduce padding, allow wrap */
+	.header-bar {
+		padding: 4px var(--space-md);
+		gap: var(--space-sm);
+		flex-wrap: wrap;
+		height: auto;
+		min-height: var(--header-height);
+	}
+
+	.header-actions {
+		gap: var(--space-sm);
+		flex-wrap: wrap;
+		margin-left: 0;
+	}
+
+	/* Dashboard bar — scrollable row on mobile */
+	.dashboard-bar {
+		overflow-x: auto;
+		overflow-y: hidden;
+		flex-wrap: nowrap;
+		padding: 0 var(--space-md);
+		-webkit-overflow-scrolling: touch;
+		scrollbar-width: none;
+	}
+	.dashboard-bar::-webkit-scrollbar { display: none; }
+
+	/* Larger status badge touch area in grids */
+	.status-badge {
+		padding: 2px 8px;
+		font-size: 10px;
+	}
+
+	/* Day picker buttons bigger */
+	.day-picker-btn {
+		width: 32px;
+		height: 32px;
+		font-size: 14px;
+	}
+
+	.day-picker-date {
+		padding: 6px 10px;
+		font-size: var(--font-size-sm);
+		min-height: 32px;
+	}
+
+	/* Pane headers bigger for touch */
+	.pane-header {
+		height: 36px;
+		min-height: 36px;
+		padding: 0 var(--space-md);
+	}
+
+	/* Divider — taller touch target */
+	.split-divider {
+		height: 10px;
+		min-height: 10px;
+	}
+
+	/* Calendar picker — wider on phone */
+	.cal-picker {
+		min-width: 280px;
+	}
+
+	.cal-day {
+		padding: 6px 2px;
+		font-size: var(--font-size-sm);
+	}
+
+	.cal-today-btn {
+		padding: 6px 16px;
+		font-size: var(--font-size-xs);
+	}
+
+	/* All floating windows — full screen on mobile */
+	.fw-window,
+	.map-window {
+		position: fixed !important;
+		top: 0 !important;
+		left: 0 !important;
+		width: 100dvw !important;
+		height: 100dvh !important;
+		border-radius: 0 !important;
+	}
+
+	/* Disable resize handle on mobile */
+	.fw-resize,
+	.map-window-resize {
+		display: none;
+	}
+
+	/* Bigger close buttons for touch */
+	.fw-close,
+	.map-window-close {
+		width: 36px;
+		height: 36px;
+		font-size: 20px;
+	}
+
+	/* Taller titlebars */
+	.fw-titlebar,
+	.map-window-titlebar {
+		height: 44px;
+		min-height: 44px;
+		padding: 0 var(--space-md);
+	}
+
+	/* Override modal — full width */
+	.override-modal {
+		width: 95%;
+		max-width: none;
+	}
+
+	/* Autoroute confirm modal */
+	.autoroute-confirm {
+		width: 95%;
+		max-width: none;
+	}
 }

@@ -137,6 +137,7 @@ If any check fails, the dispatcher receives a warning with details but can overr
 | `P` | Open personnel window |
 | `J` | Open job search |
 | `A` | Auto-route (with confirmation) |
+| `Ctrl/Cmd+A` | Select all in focused grid |
 | `Esc` | Close windows / context menus |
 
 ## API
@@ -171,7 +172,36 @@ If any check fails, the dispatcher receives a warning with details but can overr
 
 ## Change Log
 
-### 0.0.7 (Latest)
+### 0.0.8 (Latest)
+ML routing + investor-ready demo day
+- **Single-container Docker** — multi-stage build (node → python). FastAPI serves the SPA via `StaticFiles`; no separate nginx. One command brings up Postgres + app: `make up` (or `make demo` to enable the simulation). Browse `http://localhost:8080`.
+- **MLStrategy** — default dispatch. Scores `(job, tech)` by `travel_time + what_if_duration(job, tech)` using hidden `speed_factor` / `skill_bonuses` modifiers. Two-pass routing: prefers techs who can arrive within the customer window, falls back to best-available so jobs never sit unrouted. `HeuristicStrategy` kept for A/B.
+- **Sim control bar** — DEMO badge, status pill, HH:MM:SS virtual clock that rolls second-by-second via local interpolation re-anchored on each WebSocket `clock_tick`. Start / Pause / Resume / Stop, 10×–500× speed. Hidden when `IS_DEMO` is unset.
+- **Demo playback lock** — once the day is running, the dispatcher can still inspect (click techs / jobs, open Map, Refresh, Timeline) but assignment-mutating UI is disabled (Auto-Route, Filter, Personnel, Job Search, drag-drop assign, context-menu assign). "DEMO PLAYING" badge bottom-right.
+- **Realistic schedule** — 1-hour job slots redistributed across 8:00-16:00 (lunch hour skipped). Universal staggered breaks (~10:30 mid-morning 15 min, 12:00 lunch 30 min) and `OFF_DUTY` flip at shift end. Tech goes `EN_ROUTE` on assign → `ON_JOB` on arrival → `AVAILABLE` on completion → `OFF_DUTY` past shift end.
+- **Tech timeline by ETA** — blocks position by `assignment.estimated_arrival` and width by `actual_duration_minutes` (sampled), not the customer time-slot window. Sequential jobs render side-by-side; manual stacks fall into vertical lanes.
+- **Past-timeframe + overrun indicators** — jobs whose `time_slot_end` has passed without completion get a red left-border (`row--overdue`); in-progress jobs past `estimated_duration` go yellow / red (`overrun_warning` WebSocket events).
+- **Auto-reseed daily** — when `IS_DEMO=true`, the app spawns a background task that wipes + reseeds Postgres at 04:00 UTC every day. AWS demo box stays fresh with zero manual touch. `/simulation/start` also resets on every click.
+- **Day-complete auto-pause** — when no active today's jobs remain, sim emits `day_complete`, halts the loop, and pauses the clock at the final virtual time so the dispatcher sees end-of-day instead of a snap to real time.
+- **Simulation engine** — asyncio dispatch loop, 1-min virtual tick. Clock singleton (simulated / real, pause / resume, live speed change without drift). Log-normal duration sampler seeded per `(job, tech)` for deterministic replay.
+- **WebSocket broadcaster** — FastAPI WS at `/api/v1/simulation/ws` streams `job_assigned`, `job_started`, `job_completed`, `overrun_warning`, `clock_tick`, `scripted_beat`, `day_complete`. Frontend reconnects with exponential backoff.
+- **Scripted beats** — Apollo Theater VIP emergency at 10:47, afternoon job surge at 12:00.
+
+### 0.0.7-and-earlier — preserved below
+Simulation engine, mobile responsive, performance
+- **Simulation engine** — asyncio dispatch loop drives a time-accelerated demo day (200× default). Clock singleton supports simulated/real modes, pause/resume, live speed changes without drift.
+- **Duration sampler** — log-normal sampling seeded per (job, tech) pair. Tech `speed_factor` and `skill_bonuses` modifiers create realistic variance. Same pair always returns the same duration (deterministic replay).
+- **WebSocket broadcaster** — FastAPI WebSocket at `/ws` broadcasts `DispatchEvent` payloads: `job_started`, `job_completed`, `overrun_warning`, `clock_tick`, `scripted_beat`. Dead connections auto-pruned.
+- **Sim control endpoints** — `IS_DEMO`-gated REST controls: `/simulation/start|pause|resume|stop|speed|status`. All return 404 in production.
+- **Day script** — three scripted beats: Dizzy Gillespie on break at 10:00, VIP Apollo Theater emergency injected at 10:47, afternoon job surge released at 12:00.
+- **Calendar date picker** — click the date label in the header to open a calendar popup (portal-rendered, escapes overflow clipping). Prev/next month navigation, Today shortcut.
+- **Mobile & touch responsive** — `@media (max-width: 768px)`: icons-only header buttons, scrollable dashboard bar, full-screen floating windows, bigger touch targets (40px buttons, 44px titlebars). Touch drag-and-drop: long-press 200ms on a job row → drag ghost → drop on tech row. Haptic feedback on drag start.
+- **Ctrl/Cmd+A select all** — selects all rows in the currently focused grid (tech or job pane).
+- **Version globalization** — single source of truth in `package.json`, injected at build time via Vite `define`. Version shown in header. Backend reads from `config.py APP_VERSION`.
+- **Performance** — drag ghost is direct DOM writes (no React re-render per frame). Selection sync uses AG Grid `getRowNode` O(1) not `forEachNode` O(n). Filter computation in `useMemo`. Tech ID lookup at drop via `useImperativeHandle.getTechIdAtPoint`.
+- **Seed data** — 25 jazz musician techs with `speed_factor` and `skill_bonuses` modifiers. 50 jobs across 13 NYC management areas. Miles Davis fast, Sun Ra catastrophic on service changes, Mary Halvorson slow new hire.
+
+### 0.0.7
 Windows, search, route criteria, map popup
 - **Display Filter Window** — Multi-select filter by time slot, job type, route criteria, and technician with Select All / None / Reset. Stacks with dashboard bar filters.
 - **Personnel Window** — Searchable list of all technicians regardless of schedule. Right-click for context actions, double-click for detail, locate-in-grid button.
@@ -260,12 +290,17 @@ Initial commit
 - [x] Route criteria / management areas
 - [x] Job evaluation (skill/route/time + distance)
 - [x] Override warning on assignment mismatch
+- [x] Automated dispatch (simulation engine with time-accelerated demo day)
+- [x] WebSocket real-time updates (backend broadcaster complete)
+- [x] Mobile responsive UI + touch drag-and-drop
+- [x] Frontend sim control bar (start/pause/resume/stop, speed selector, virtual clock)
+- [x] Overrun row highlighting (yellow/red at estimated/1.5× duration)
+- [x] ML routing strategy (embedded model — travel + predicted completion time)
+- [ ] God View debug overlay (reveal tech modifiers: speed_factor, skill_bonuses)
 - [ ] Job visual column (per-job evaluation mode on tech grid)
 - [ ] Dark/light theme toggle
 - [ ] Account system with role-based access
 - [ ] Column state persistence per user
-- [ ] Automated dispatch (job drip — system assigns jobs as they arrive)
-- [ ] WebSocket real-time updates
 - [ ] Mobile technician PWA
 - [ ] Docker compose full stack
 - [x] Hosted live demo

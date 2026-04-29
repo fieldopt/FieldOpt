@@ -14,9 +14,10 @@ class Settings(BaseSettings):
 
 	# Application
 	APP_NAME: str = "FieldOpt"
-	APP_VERSION: str = "0.0.7"
+	APP_VERSION: str = "0.0.8"
 	DEBUG: bool = True
 	ENVIRONMENT: str = "development"
+	IS_DEMO: bool = False  # Enable simulation engine and /simulation/* endpoints
 
 	# Database - PostgreSQL
 	DATABASE_URL: str = "postgresql://fieldopt:fieldopt@localhost:5432/fieldopt"
