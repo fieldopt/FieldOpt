@@ -1,6 +1,6 @@
 ## Overview
-
-An open-source field service management system built with FastAPI, PostgreSQL, Vite, and React. FieldOpt is an enterprise-grade dispatch console designed for dispatchers and field service companies to efficiently assign, route, and manage service jobs across a workforce of field technicians.
+FieldOpt - v0.0.8<br>
+An open-source field service management system. FieldOpt is an enterprise-grade dispatch console designed for dispatchers and field service companies to efficiently assign, route, and manage service jobs across a workforce of field technicians.
 
 <table align="center">
 	<tr>
@@ -186,9 +186,6 @@ ML routing + investor-ready demo day
 - **Simulation engine** — asyncio dispatch loop, 1-min virtual tick. Clock singleton (simulated / real, pause / resume, live speed change without drift). Log-normal duration sampler seeded per `(job, tech)` for deterministic replay.
 - **WebSocket broadcaster** — FastAPI WS at `/api/v1/simulation/ws` streams `job_assigned`, `job_started`, `job_completed`, `overrun_warning`, `clock_tick`, `scripted_beat`, `day_complete`. Frontend reconnects with exponential backoff.
 - **Scripted beats** — Apollo Theater VIP emergency at 10:47, afternoon job surge at 12:00.
-
-### 0.0.7-and-earlier — preserved below
-Simulation engine, mobile responsive, performance
 - **Simulation engine** — asyncio dispatch loop drives a time-accelerated demo day (200× default). Clock singleton supports simulated/real modes, pause/resume, live speed changes without drift.
 - **Duration sampler** — log-normal sampling seeded per (job, tech) pair. Tech `speed_factor` and `skill_bonuses` modifiers create realistic variance. Same pair always returns the same duration (deterministic replay).
 - **WebSocket broadcaster** — FastAPI WebSocket at `/ws` broadcasts `DispatchEvent` payloads: `job_started`, `job_completed`, `overrun_warning`, `clock_tick`, `scripted_beat`. Dead connections auto-pruned.
@@ -201,24 +198,24 @@ Simulation engine, mobile responsive, performance
 - **Performance** — drag ghost is direct DOM writes (no React re-render per frame). Selection sync uses AG Grid `getRowNode` O(1) not `forEachNode` O(n). Filter computation in `useMemo`. Tech ID lookup at drop via `useImperativeHandle.getTechIdAtPoint`.
 - **Seed data** — 25 jazz musician techs with `speed_factor` and `skill_bonuses` modifiers. 50 jobs across 13 NYC management areas. Miles Davis fast, Sun Ra catastrophic on service changes, Mary Halvorson slow new hire.
 
-### 0.0.7
-Windows, search, route criteria, map popup
-- **Display Filter Window** — Multi-select filter by time slot, job type, route criteria, and technician with Select All / None / Reset. Stacks with dashboard bar filters.
-- **Personnel Window** — Searchable list of all technicians regardless of schedule. Right-click for context actions, double-click for detail, locate-in-grid button.
-- **Job Search Window** — Multi-criteria search (date range, job ID, tech #, customer name, status, type, route criteria). Full AG Grid results with all columns matching the main display. Right-click and double-click support. Drag from search results onto a tech in the R&D.
-- **Job Detail Panel** — Double-click any job (main grid or search results) for full detail view: customer, address, route criteria, schedule, assignment, skills, description, notes, timestamps.
-- **Map as real OS popup** — Map opens via `window.open()` as a standalone window for multi-monitor setups. Syncs live data via BroadcastChannel. Falls back to in-page floating window if popup is blocked.
-- **Route Criteria / Management Areas** — `route_criteria` field on jobs, `assigned_routes` on technicians. 13 NYC management areas in seed data. Route criteria column in job grid, routes column in tech grid.
-- **Job evaluation** — Expanded from skill-only to skill + route + time checks with haversine distance calculation. Override warning modal on assign with ✓/✕ indicators for each check.
-- **Auto-route confirmation** — Auto-route now prompts for confirmation before executing.
-- **Toolbar** — Filter, Personnel, Job Search buttons in header bar.
-- **Keyboard shortcuts** — F (filter), P (personnel), J (job search), A (auto-route).
-- **Backend** — `GET /jobs/search/query` endpoint, expanded Job Evaluation endpoint, route_criteria on all job schemas.
-- Header and dashboard bar scroll gracefully on narrow windows.
-
 ### Previous Versions
 <details>
 <summary>Previous Changes</summary>
+
+***0.0.7***<br>
+Windows, search, route criteria, map popup
+- Display Filter Window — Multi-select filter by time slot, job type, route criteria, and technician with Select All / None / Reset. Stacks with dashboard bar filters.
+- Personnel Window — Searchable list of all technicians regardless of schedule. Right-click for context actions, double-click for detail, locate-in-grid button.
+- Job Search Window — Multi-criteria search (date range, job ID, tech #, customer name, status, type, route criteria). Full AG Grid results with all columns matching the main display. Right-click and double-click support. Drag from search results onto a tech in the R&D.
+- Job Detail Panel — Double-click any job (main grid or search results) for full detail view: customer, address, route criteria, schedule, assignment, skills, description, notes, timestamps.
+- Map as real OS popup — Map opens via `window.open()` as a standalone window for multi-monitor setups. Syncs live data via BroadcastChannel. Falls back to in-page floating window if popup is blocked.
+- Route Criteria / Management Areas — `route_criteria` field on jobs, `assigned_routes` on technicians. 13 NYC management areas in seed data. Route criteria column in job grid, routes column in tech grid.
+- Job evaluation — Expanded from skill-only to skill + route + time checks with haversine distance calculation. Override warning modal on assign with ✓/✕ indicators for each check.
+- Auto-route confirmation — Auto-route now prompts for confirmation before executing.
+- Toolbar — Filter, Personnel, Job Search buttons in header bar.
+- Keyboard shortcuts — F (filter), P (personnel), J (job search), A (auto-route).
+- Backend — `GET /jobs/search/query` endpoint, expanded Job Evaluation endpoint, route_criteria on all job schemas.
+- Header and dashboard bar scroll gracefully on narrow windows.
 
 ***0.0.6***<br>
 Dispatch interactivity + batch operations
@@ -308,7 +305,6 @@ Initial commit
 ## Contributing
 
 If you share the belief that simplicity empowers creativity, feel free to contribute.
-- Fork this repo
 - Submit a Pull Request
 - Bug reports and feature requests
 
